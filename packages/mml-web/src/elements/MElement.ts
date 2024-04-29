@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import InstancedMeshManager from "./InstancedMeshManager";
 import { RemoteDocument } from "./RemoteDocument";
 import { consumeEventEventName } from "../common";
 import { getGlobalDocumentTimeManager, getGlobalMMLScene } from "../global";
@@ -21,6 +22,9 @@ export abstract class MElement extends HTMLElement {
 
   protected container: THREE.Group;
   private currentParentContainer: THREE.Object3D | null = null;
+
+  private instancedMeshManager?: InstancedMeshManager;
+  private instanceIndex?: number;
 
   constructor() {
     super();
@@ -242,6 +246,8 @@ export abstract class MElement extends HTMLElement {
       throw new Error("Already connected to a parent");
     }
 
+    this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene().getThreeScene());
+
     const mElementParent = this.getMElementParent();
     if (mElementParent) {
       this.currentParentContainer = mElementParent.container;
@@ -263,5 +269,20 @@ export abstract class MElement extends HTMLElement {
 
     this.currentParentContainer.remove(this.container);
     this.currentParentContainer = null;
+  }
+
+  public getInstanceManager() {
+    if (!this.instancedMeshManager) {
+      this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene().getThreeScene());
+    }
+    return this.instancedMeshManager;
+  }
+
+  public setInstanceIndex(index: number | undefined) {
+    this.instanceIndex = index;
+  }
+
+  public getInstanceIndex() {
+    return this.instanceIndex;
   }
 }

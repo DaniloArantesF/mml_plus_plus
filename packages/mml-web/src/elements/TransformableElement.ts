@@ -13,7 +13,7 @@ import { DebugHelper } from "../utils/DebugHelper";
 import { OrientedBoundingBox } from "../utils/OrientedBoundingBox";
 
 // Workaround for zero-scale values breaking audio playback in THREE PositionalAudio
-function minimumNonZero(value: number): number {
+export function minimumNonZero(value: number): number {
   return value === 0 ? 0.000001 : value;
 }
 
@@ -250,6 +250,18 @@ export abstract class TransformableElement extends MElement {
   }
 
   private didUpdateTransformation() {
+    const instancedIndex = this.getInstanceIndex();
+
+    // Update position and rotation of transformable instance
+    if (instancedIndex !== undefined) {
+      this.getInstanceManager().updateTransform(
+        instancedIndex,
+        this.container.position.clone(),
+        new THREE.Quaternion().setFromEuler(this.container.rotation, true),
+        undefined,
+      );
+    }
+
     this.applyBounds();
     this.parentTransformed();
     traverseImmediateTransformableElementChildren(this, (child) => {

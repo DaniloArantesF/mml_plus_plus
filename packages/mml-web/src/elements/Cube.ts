@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 import { AnimationType, AttributeAnimation } from "./AttributeAnimation";
 import { MElement } from "./MElement";
-import { TransformableElement } from "./TransformableElement";
+import { minimumNonZero, TransformableElement } from "./TransformableElement";
 import { AnimatedAttributeHelper } from "../utils/AnimatedAttributeHelper";
 import {
   AttributeHandler,
@@ -19,11 +19,45 @@ const defaultCubeHeight = 1;
 const defaultCubeDepth = 1;
 const defaultCubeOpacity = 1;
 const defaultCubeCastShadows = true;
+const defaultInstanced = false;
+const defaultScaleX = 1;
+const defaultScaleY = 1;
+const defaultScaleZ = 1;
 
 export class Cube extends TransformableElement {
   static tagName = "m-cube";
 
   private cubeAnimatedAttributeHelper = new AnimatedAttributeHelper(this, {
+    sx: [
+      AnimationType.Number,
+      1,
+      (newValue: number) => {
+        if (this.props.instanced) {
+          this.container.scale.x = minimumNonZero(newValue);
+          this.updateInstancedMesh();
+        }
+      },
+    ],
+    sy: [
+      AnimationType.Number,
+      1,
+      (newValue: number) => {
+        if (this.props.instanced) {
+          this.container.scale.y = minimumNonZero(newValue);
+          this.updateInstancedMesh();
+        }
+      },
+    ],
+    sz: [
+      AnimationType.Number,
+      1,
+      (newValue: number) => {
+        if (this.props.instanced) {
+          this.container.scale.z = minimumNonZero(newValue);
+          this.updateInstancedMesh();
+        }
+      },
+    ],
     color: [
       AnimationType.Color,
       defaultCubeColor,
@@ -32,6 +66,13 @@ export class Cube extends TransformableElement {
         if (this.material) {
           this.material.color = this.props.color;
         }
+        if (this.props.instanced && this.getInstanceIndex() !== undefined) {
+          this.getInstanceManager()?.update(
+            this.getInstanceIndex() as number,
+            this.getInstanceMatrix(),
+            this.props.color,
+          );
+        }
       },
     ],
     width: [
@@ -39,7 +80,13 @@ export class Cube extends TransformableElement {
       defaultCubeWidth,
       (newValue: number) => {
         this.props.width = newValue;
-        this.mesh.scale.x = this.props.width;
+
+        if (this.props.instanced) {
+          this.updateInstancedMesh();
+        } else {
+          this.mesh.scale.x = this.props.width;
+        }
+
         this.applyBounds();
         this.collideableHelper.updateCollider(this.mesh);
       },
@@ -49,7 +96,13 @@ export class Cube extends TransformableElement {
       defaultCubeHeight,
       (newValue: number) => {
         this.props.height = newValue;
-        this.mesh.scale.y = this.props.height;
+
+        if (this.props.instanced) {
+          this.updateInstancedMesh();
+        } else {
+          this.mesh.scale.y = this.props.height;
+        }
+
         this.applyBounds();
         this.collideableHelper.updateCollider(this.mesh);
       },
@@ -59,7 +112,13 @@ export class Cube extends TransformableElement {
       defaultCubeDepth,
       (newValue: number) => {
         this.props.depth = newValue;
-        this.mesh.scale.z = this.props.depth;
+
+        if (this.props.instanced) {
+          this.updateInstancedMesh();
+        } else {
+          this.mesh.scale.z = this.props.depth;
+        }
+
         this.applyBounds();
         this.collideableHelper.updateCollider(this.mesh);
       },
@@ -82,6 +141,10 @@ export class Cube extends TransformableElement {
   static boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
   private props = {
+    sx: defaultScaleX,
+    sy: defaultScaleY,
+    sz: defaultScaleZ,
+    instanced: defaultInstanced,
     width: defaultCubeWidth,
     height: defaultCubeHeight,
     depth: defaultCubeDepth,
@@ -94,6 +157,30 @@ export class Cube extends TransformableElement {
   private collideableHelper = new CollideableHelper(this);
 
   private static attributeHandler = new AttributeHandler<Cube>({
+    sx: (instance) => {
+      instance.props.sx = parseFloatAttribute(instance.getAttribute("sx"), 1);
+      if (instance.props.instanced) {
+        instance.updateInstancedMesh();
+      }
+    },
+    sy: (instance) => {
+      instance.props.sy = parseFloatAttribute(instance.getAttribute("sy"), 1);
+      if (instance.props.instanced) {
+        instance.updateInstancedMesh();
+      }
+    },
+    sz: (instance) => {
+      instance.props.sz = parseFloatAttribute(instance.getAttribute("sz"), 1);
+      if (instance.props.instanced) {
+        instance.updateInstancedMesh();
+      }
+    },
+    instanced: (instance, newValue) => {
+      instance.props.instanced = parseBoolAttribute(newValue, defaultInstanced);
+      if (instance.isConnected) {
+        instance.updateMeshType();
+      }
+    },
     width: (instance, newValue) => {
       instance.cubeAnimatedAttributeHelper.elementSetAttribute(
         "width",
@@ -204,6 +291,17 @@ export class Cube extends TransformableElement {
 
   public connectedCallback(): void {
     super.connectedCallback();
+
+    if (this.props.instanced) {
+      this.container.updateMatrix();
+
+      this.setInstanceIndex(
+        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color),
+      );
+
+      this.container.remove(this.mesh);
+    }
+
     this.material = new THREE.MeshStandardMaterial({
       color: this.props.color,
       transparent: this.props.opacity === 1 ? false : true,
@@ -222,5 +320,58 @@ export class Cube extends TransformableElement {
       this.material = null;
     }
     super.disconnectedCallback();
+  }
+
+  private getInstanceMatrix() {
+    const position = this.container.position.clone();
+    const quaternion = this.container.quaternion.clone();
+    const scale = this.container.scale
+      .clone()
+      .multiplyVectors(
+        new THREE.Vector3(this.props.width, this.props.height, this.props.depth),
+        new THREE.Vector3(this.props.sx, this.props.sy, this.props.sz),
+      );
+
+    return new THREE.Matrix4().compose(position, quaternion, scale);
+  }
+
+  // Called to switch between instanced and non-instanced mesh types
+  // It is assumed that the caller has updated the props.instanced flag
+  private updateMeshType() {
+    console.log("switching mesh type")
+    if (this.props.instanced) {
+      // Switch from mesh to instanced
+      this.setInstanceIndex(
+        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color),
+      );
+
+      this.container.remove(this.mesh);
+    } else {
+      // Switch from instanced to mesh
+      if (this.getInstanceIndex() !== undefined) {
+        this.getInstanceManager()?.unregister(this.getInstanceIndex() as number);
+        this.setInstanceIndex(undefined);
+      }
+      this.container.add(this.mesh);
+    }
+  }
+
+  // Only the scale is updated here since we need to know the dimensions of the cube
+  private updateInstancedMesh(): void {
+    if (this.getInstanceIndex() === undefined) {
+      return;
+    }
+
+    const scale = new THREE.Vector3().multiplyVectors(
+      new THREE.Vector3(this.props.width, this.props.height, this.props.depth),
+      new THREE.Vector3(this.props.sx, this.props.sy, this.props.sz),
+    );
+
+    this.getInstanceManager()?.updateTransform(
+      this.getInstanceIndex() as number,
+      undefined,
+      undefined,
+      scale,
+    );
   }
 }

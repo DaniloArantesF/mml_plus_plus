@@ -4,6 +4,7 @@ import { Controls } from "./camera/Controls";
 import { DragFlyCameraControls } from "./camera/DragFlyCameraControls";
 import { PointerLockFlyCameraControls } from "./camera/PointerLockFlyCameraControls";
 import { ChatProbe } from "./elements/ChatProbe";
+import InstancedMeshManager from "./elements/InstancedMeshManager";
 import { Interaction } from "./elements/Interaction";
 import { MElement } from "./elements/MElement";
 import { InteractionManager } from "./interaction-ui";
@@ -105,6 +106,8 @@ export class MMLScene implements IMMLScene {
   private resizeObserver: ResizeObserver;
   private loadingProgressManager: LoadingProgressManager;
 
+  private instancedMeshManager: InstancedMeshManager;
+
   constructor(private options: MMLSceneOptions = {}) {
     this.element = document.createElement("div");
     this.element.style.width = "100%";
@@ -191,6 +194,8 @@ export class MMLScene implements IMMLScene {
     this.element.appendChild(this.renderer.domElement);
 
     this.fitContainer();
+
+    this.instancedMeshManager = InstancedMeshManager.getInstance(this.threeScene);
   }
 
   public getThreeScene(): THREE.Scene {
@@ -264,6 +269,7 @@ export class MMLScene implements IMMLScene {
     this.clickTrigger.dispose();
     this.promptManager.dispose();
     this.interactionManager.dispose();
+    this.instancedMeshManager.dispose();
   }
 
   public prompt(promptProps: PromptProps, callback: (message: string | null) => void) {
