@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import InstancedMeshManager from "./elements/InstancedMeshManager";
 import { MElement } from "./elements/MElement";
 import { IMMLScene } from "./MMLScene";
 import { EventHandlerCollection } from "./utils/events/EventHandlerCollection";
@@ -20,6 +21,8 @@ export class MMLClickTrigger {
   private mouseDownTime: number | null = null;
   private mouseMoveDelta = 0;
 
+  private instancedMeshManager: InstancedMeshManager;
+
   static init(clickTarget: Document | HTMLElement, scene: IMMLScene): MMLClickTrigger {
     return new MMLClickTrigger(clickTarget, scene);
   }
@@ -32,6 +35,10 @@ export class MMLClickTrigger {
     this.eventHandlerCollection.add(clickTarget, "mousedown", this.handleMouseDown.bind(this));
     this.eventHandlerCollection.add(clickTarget, "mouseup", this.handleMouseUp.bind(this));
     this.eventHandlerCollection.add(clickTarget, "mousemove", this.handleMouseMove.bind(this));
+  }
+
+  public setInstancedMeshManager(instancedMeshManager: InstancedMeshManager) {
+    this.instancedMeshManager = instancedMeshManager;
   }
 
   private handleMouseDown() {
@@ -77,19 +84,29 @@ export class MMLClickTrigger {
       y = -((event.offsetY / height) * 2 - 1);
     }
     this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.scene.getCamera());
-    const intersections = this.raycaster.intersectObject(this.scene.getRootContainer(), true);
+
+    // Get instanced meshes and re-order the intersections array
+    const intersections = this.raycaster.intersectObjects(
+      [this.scene.getRootContainer(), this.instancedMeshManager.cubeMesh],
+      true,
+    );
+
     if (intersections.length > 0) {
       for (const intersection of intersections) {
         let obj: THREE.Object3D | null = intersection.object;
         while (obj) {
           /*
-             Ignore scene objects that have a transparent or wireframe material
+             Ignore scene objects thinstaat have a transparent or wireframe material
             */
           if (this.isMaterialIgnored(obj)) {
             break;
           }
 
-          const mElement = MElement.getMElementFromObject(obj);
+          let mElement = MElement.getMElementFromObject(obj);
+          if (!mElement && (obj as any).isInstancedMesh) {
+            mElement = this.instancedMeshManager.getParent(intersection.instanceId ?? -1);
+          }
+
           if (mElement && mElement.isClickable()) {
             // let's get the intersection point relative to the element origin
 

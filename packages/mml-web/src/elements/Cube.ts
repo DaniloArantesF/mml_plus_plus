@@ -296,7 +296,7 @@ export class Cube extends TransformableElement {
       this.container.updateMatrix();
 
       this.setInstanceIndex(
-        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color),
+        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color, this),
       );
 
       this.container.remove(this.mesh);
@@ -338,11 +338,10 @@ export class Cube extends TransformableElement {
   // Called to switch between instanced and non-instanced mesh types
   // It is assumed that the caller has updated the props.instanced flag
   private updateMeshType() {
-    console.log("switching mesh type")
     if (this.props.instanced) {
       // Switch from mesh to instanced
       this.setInstanceIndex(
-        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color),
+        this.getInstanceManager()?.register(this.getInstanceMatrix(), this.props.color, this),
       );
 
       this.container.remove(this.mesh);

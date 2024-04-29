@@ -1,6 +1,9 @@
 import * as THREE from "three";
 
+import { MElement } from "./MElement";
+
 class InstancedMeshManager {
+  private parentMap: Map<number, MElement> = new Map();
   private cubeCount = 0;
 
   private boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -10,7 +13,7 @@ class InstancedMeshManager {
   });
 
   private static instance?: InstancedMeshManager;
-  private cubeMesh: THREE.InstancedMesh;
+  public cubeMesh: THREE.InstancedMesh;
   private scene?: THREE.Scene;
 
   private constructor(scene: THREE.Scene) {
@@ -22,6 +25,10 @@ class InstancedMeshManager {
       InstancedMeshManager.instance = new InstancedMeshManager(scene);
     }
     return InstancedMeshManager.instance;
+  }
+
+  public getParent(instanceId: number) {
+    return this.parentMap.get(instanceId) || null;
   }
 
   private createCubeMesh(scene: THREE.Scene): THREE.InstancedMesh {
@@ -38,7 +45,7 @@ class InstancedMeshManager {
     return cubeMesh;
   }
 
-  public register(matrix: THREE.Matrix4, color: THREE.Color): number {
+  public register(matrix: THREE.Matrix4, color: THREE.Color, parent: MElement): number {
     if (this.cubeCount === 0) {
       this.material.needsUpdate = true;
     }
@@ -47,6 +54,7 @@ class InstancedMeshManager {
     this.cubeMesh.count = this.cubeCount;
     this.update(newIndex, matrix, color);
 
+    this.parentMap.set(newIndex, parent);
     return newIndex;
   }
 
@@ -54,6 +62,7 @@ class InstancedMeshManager {
     this.cubeMesh.setMatrixAt(index, new THREE.Matrix4());
     this.cubeMesh.count = --this.cubeCount;
     this.cubeMesh.instanceMatrix.needsUpdate = true;
+    this.parentMap.delete(index);
   }
 
   public update(index: number, matrix?: THREE.Matrix4, color?: THREE.Color): void {

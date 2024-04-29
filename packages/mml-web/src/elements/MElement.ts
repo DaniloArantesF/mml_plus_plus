@@ -285,4 +285,14 @@ export abstract class MElement extends HTMLElement {
   public getInstanceIndex() {
     return this.instanceIndex;
   }
+
+  public applyId(geometry: THREE.BufferGeometry, id: number) {
+    const position = geometry.attributes.position;
+    const array = new Int16Array(position.count);
+    array.fill(id);
+
+    const bufferAttribute = new THREE.Int16BufferAttribute(array, 1, false);
+    bufferAttribute.gpuType = THREE.IntType;
+    geometry.setAttribute("id", bufferAttribute);
+  }
 }

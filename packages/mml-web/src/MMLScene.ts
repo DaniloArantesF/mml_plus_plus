@@ -64,6 +64,7 @@ export type IMMLScene = {
   prompt: (promptProps: PromptProps, callback: (message: string | null) => void) => void;
 
   getLoadingProgressManager?: () => LoadingProgressManager | null;
+  getInstancedMeshManager: () => InstancedMeshManager;
 };
 
 export enum ControlsType {
@@ -196,6 +197,7 @@ export class MMLScene implements IMMLScene {
     this.fitContainer();
 
     this.instancedMeshManager = InstancedMeshManager.getInstance(this.threeScene);
+    this.clickTrigger.setInstancedMeshManager(this.instancedMeshManager);
   }
 
   public getThreeScene(): THREE.Scene {
@@ -426,5 +428,9 @@ export class MMLScene implements IMMLScene {
       width: maxX - minX,
       height: maxY - minY,
     };
+  }
+
+  public getInstancedMeshManager(): InstancedMeshManager {
+    return this.instancedMeshManager;
   }
 }
