@@ -319,6 +319,11 @@ export class Cube extends TransformableElement {
       this.mesh.material = [];
       this.material = null;
     }
+
+    if (this.getInstanceIndex() !== undefined && this.props.instanced) {
+      this.getInstanceManager()?.unregister(this.getInstanceIndex() as number);
+    }
+
     super.disconnectedCallback();
   }
 

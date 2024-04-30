@@ -35,6 +35,8 @@ export class MMLClickTrigger {
     this.eventHandlerCollection.add(clickTarget, "mousedown", this.handleMouseDown.bind(this));
     this.eventHandlerCollection.add(clickTarget, "mouseup", this.handleMouseUp.bind(this));
     this.eventHandlerCollection.add(clickTarget, "mousemove", this.handleMouseMove.bind(this));
+
+    this.instancedMeshManager = InstancedMeshManager.getInstance(scene.getThreeScene());
   }
 
   public setInstancedMeshManager(instancedMeshManager: InstancedMeshManager) {

@@ -63,6 +63,9 @@ class InstancedMeshManager {
     this.cubeMesh.count = --this.cubeCount;
     this.cubeMesh.instanceMatrix.needsUpdate = true;
     this.parentMap.delete(index);
+    if (this.cubeCount === 0) {
+      this.material.needsUpdate = true;
+    }
   }
 
   public update(index: number, matrix?: THREE.Matrix4, color?: THREE.Color): void {
