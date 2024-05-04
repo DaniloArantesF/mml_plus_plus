@@ -328,14 +328,12 @@ export class Cube extends TransformableElement {
   }
 
   private getInstanceMatrix() {
-    const position = this.container.position.clone();
-    const quaternion = this.container.quaternion.clone();
-    const scale = this.container.scale
-      .clone()
-      .multiplyVectors(
-        new THREE.Vector3(this.props.width, this.props.height, this.props.depth),
-        new THREE.Vector3(this.props.sx, this.props.sy, this.props.sz),
-      );
+    const position = this.container.getWorldPosition(new THREE.Vector3());
+    const quaternion = this.container.getWorldQuaternion(new THREE.Quaternion());
+    const scale = new THREE.Vector3().multiplyVectors(
+      new THREE.Vector3(this.props.width, this.props.height, this.props.depth),
+      this.container.getWorldScale(new THREE.Vector3()),
+    );
 
     return new THREE.Matrix4().compose(position, quaternion, scale);
   }
@@ -360,22 +358,10 @@ export class Cube extends TransformableElement {
     }
   }
 
-  // Only the scale is updated here since we need to know the dimensions of the cube
   private updateInstancedMesh(): void {
     if (this.getInstanceIndex() === undefined) {
       return;
     }
-
-    const scale = new THREE.Vector3().multiplyVectors(
-      new THREE.Vector3(this.props.width, this.props.height, this.props.depth),
-      new THREE.Vector3(this.props.sx, this.props.sy, this.props.sz),
-    );
-
-    this.getInstanceManager()?.updateTransform(
-      this.getInstanceIndex() as number,
-      undefined,
-      undefined,
-      scale,
-    );
+    this.getInstanceManager()?.update(this.getInstanceIndex() as number, this.getInstanceMatrix());
   }
 }
