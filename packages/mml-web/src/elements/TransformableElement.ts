@@ -254,12 +254,7 @@ export abstract class TransformableElement extends MElement {
 
     // Update position and rotation of transformable instance
     if (instancedIndex !== undefined) {
-      this.getInstanceManager().updateTransform(
-        instancedIndex,
-        this.container.position.clone(),
-        new THREE.Quaternion().setFromEuler(this.container.rotation, true),
-        undefined,
-      );
+      this.updateInstanceTransform();
     }
 
     this.applyBounds();
@@ -369,6 +364,26 @@ export abstract class TransformableElement extends MElement {
 
   private updateVisibility() {
     this.container.visible = this.desiredVisible && !this.isDisabled();
+  }
+
+  // For now we treat instanced models and cubes differently in the InstancedMeshManager.
+  // This method calls the appropriate method to update the instance's transform.
+  public updateInstanceTransform() {
+    const instanceManager = this.getInstanceManager();
+    const instanceIndex = this.getInstanceIndex()!;
+    switch (this.tagName) {
+      case 'M-MODEL':
+        return instanceManager.updateModel(this.getAttribute("src")!, instanceIndex);
+      case 'M-CUBE':
+        return instanceManager.updateTransform(
+          instanceIndex,
+          this.container.position.clone(),
+          new THREE.Quaternion().setFromEuler(this.container.rotation, true),
+          undefined,
+        );
+      default:
+        console.error(`Unhandled tag name ${this.tagName}`);
+    }
   }
 }
 

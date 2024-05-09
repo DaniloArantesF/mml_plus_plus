@@ -98,7 +98,7 @@ export class MMLClickTrigger {
         let obj: THREE.Object3D | null = intersection.object;
         while (obj) {
           /*
-             Ignore scene objects thinstaat have a transparent or wireframe material
+             Ignore scene objects that have a transparent or wireframe material
             */
           if (this.isMaterialIgnored(obj)) {
             break;

@@ -20,11 +20,13 @@ const defaultModelAnimStartTime = 0;
 const defaultModelAnimPauseTime = null;
 const defaultModelCastShadows = true;
 const defaultModelDebug = false;
+const defaultModelInstanced = false;
 
 export class Model extends TransformableElement {
   static tagName = "m-model";
-
+  private static modelCache = new Map<string, THREE.Group>();
   private props = {
+    instanced: defaultModelInstanced,
     src: defaultModelSrc,
     anim: defaultModelAnim,
     animStartTime: defaultModelAnimStartTime,
@@ -74,6 +76,12 @@ export class Model extends TransformableElement {
   );
 
   private static attributeHandler = new AttributeHandler<Model>({
+    instanced: (instance, newValue) => {
+      instance.props.instanced = parseBoolAttribute(newValue, defaultModelInstanced);
+      if (instance.isConnected) {
+        instance.updateMeshType();
+      }
+    },
     src: (instance, newValue) => {
       instance.setSrc(newValue);
     },
@@ -220,7 +228,53 @@ export class Model extends TransformableElement {
     return true;
   }
 
-  private setSrc(newValue: string | null) {
+  private threeObject: THREE.Object3D = new THREE.Object3D();
+
+  public matrixWorld: THREE.Matrix4 = new THREE.Matrix4(); // Ensure this exists and is managed appropriately
+
+  public updateMatrixWorld(force: boolean = false): void {
+    this.threeObject.updateMatrixWorld(force);
+  }
+
+  public getInstanceMatrix(): THREE.Matrix4 {
+    const position = this.container.getWorldPosition(new THREE.Vector3());
+    const quaternion = this.container.getWorldQuaternion(new THREE.Quaternion());
+    const scale = this.container.getWorldScale(new THREE.Vector3());
+
+    return new THREE.Matrix4().compose(position, quaternion, scale);
+  }
+
+  private calculateBoundingBox(group: THREE.Object3D): OrientedBoundingBox {
+    // First, get the instance matrix which reflects the world transformation
+    const instanceMatrix = this.getInstanceMatrix();
+
+    // Then, compute the bounding box in local space and apply the instance matrix
+    const boundingBox = new THREE.Box3().setFromObject(group);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    boundingBox.getSize(size);
+    boundingBox.getCenter(center);
+
+    // Apply the instance matrix to center to transform it to world coordinates
+    center.applyMatrix4(instanceMatrix);
+
+    // Now, you can create the oriented bounding box correctly in the world context
+    return OrientedBoundingBox.fromSizeMatrixWorldProviderAndCenter(
+      size,
+      this, // this should be compatible with the MatrixWorldProvider interface
+      center, // this is now in world coordinates
+    );
+  }
+
+  private setSrc(newValue: string | null): void {
+    // console.log(`🛠 setSrc()`);
+    // console.log({
+    //   loadedState: this.loadedState,
+    //   src: newValue,
+    //   instanceIndex: this.getInstanceIndex(),
+    //   connected: this.isConnected
+    // });
+
     this.props.src = (newValue || "").trim();
     if (this.loadedState !== null) {
       this.collideableHelper.removeColliders();
@@ -247,7 +301,6 @@ export class Model extends TransformableElement {
       return;
     }
     if (!this.isConnected) {
-      // Loading will happen when connected
       return;
     }
 
@@ -260,57 +313,52 @@ export class Model extends TransformableElement {
     srcModelPromise
       .then((result) => {
         if (this.latestSrcModelPromise !== srcModelPromise || !this.isConnected) {
-          // If we've loaded a different model since, or we're no longer connected, dispose of this one
           Model.disposeOfGroup(result.group);
           return;
         }
+        // Check for skinned meshes
+        let hasSkinnedMesh = false;
         result.group.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = this.props.castShadows;
-            child.receiveShadow = true;
+          if (child instanceof THREE.SkinnedMesh) {
+            hasSkinnedMesh = true;
           }
         });
-        this.latestSrcModelPromise = null;
-        const group = result.group;
-        const bones = new Map<string, THREE.Bone>();
-        group.traverse((object) => {
-          if (object instanceof THREE.Bone) {
-            bones.set(object.name, object);
-          }
-        });
-        const boundingBox = new THREE.Box3();
-        group.updateWorldMatrix(true, true);
-        boundingBox.expandByObject(group);
 
-        const orientedBoundingBox = OrientedBoundingBox.fromSizeMatrixWorldProviderAndCenter(
-          boundingBox.getSize(new THREE.Vector3(0, 0, 0)),
-          this.container,
-          boundingBox.getCenter(new THREE.Vector3(0, 0, 0)),
-        );
         this.loadedState = {
-          group,
-          bones,
-          boundingBox: orientedBoundingBox,
+          group: result.group,
+          bones: new Map(), // Assuming bones map setup is elsewhere if needed
+          boundingBox: this.calculateBoundingBox(result.group), // You'll need to implement this method
         };
-        this.container.add(group);
+
+        // Instance handling
+        if (!hasSkinnedMesh) {
+          const cachedGroup = Model.modelCache.get(this.props.src);
+          if (cachedGroup) {
+            this.updateMeshType();
+          } else {
+            Model.modelCache.set(this.props.src, result.group.clone()); // Cache the original group for future instances
+            this.updateMeshType();
+          }
+        } else {
+          this.container.add(result.group); // Add non-instanced if skinned mesh
+        }
+
         this.applyBounds();
-        this.collideableHelper.updateCollider(group);
+        this.collideableHelper.updateCollider(result.group);
+        this.updateDebugVisualisation();
 
         const parent = this.parentElement;
-        if (parent instanceof Model) {
-          if (!this.latestAnimPromise && !this.currentAnimationClip) {
-            parent.registerAttachment(this);
-            this.registeredParentAttachment = parent;
-          }
+        if (parent instanceof Model && !this.latestAnimPromise && !this.currentAnimationClip) {
+          parent.registerAttachment(this);
+          this.registeredParentAttachment = parent;
         }
 
         if (this.currentAnimationClip) {
           this.playAnimation(this.currentAnimationClip);
         }
+
         this.onModelLoadComplete();
         this.srcLoadingInstanceManager.finish();
-
-        this.updateDebugVisualisation();
       })
       .catch((err) => {
         console.error("Error loading m-model.src", err);
@@ -420,6 +468,7 @@ export class Model extends TransformableElement {
   }
 
   disconnectedCallback() {
+    // console.log(`🟥 disconnectedCallback()`);
     // stop listening to document time ticking
     if (this.documentTimeTickListener) {
       this.documentTimeTickListener.remove();
@@ -431,6 +480,12 @@ export class Model extends TransformableElement {
       this.registeredParentAttachment = null;
     }
     if (this.loadedState) {
+      // Remove instance
+      const instanceIndex = this.getInstanceIndex();
+      if (instanceIndex !== undefined) {
+        this.getInstanceManager().unregisterModel(this.props.src, instanceIndex);
+      }
+
       this.loadedState.group.removeFromParent();
       Model.disposeOfGroup(this.loadedState.group);
       this.loadedState = null;
@@ -561,6 +616,36 @@ export class Model extends TransformableElement {
       const value = (material as any)[key];
       if (value && typeof value === "object" && "minFilter" in value) {
         value.dispose();
+      }
+    }
+  }
+
+  private updateMeshType() {
+    // console.info(`🟥 updateMeshType()`);
+    const model = Model.modelCache.get(this.props.src);
+    let instanceIndex = this.getInstanceIndex();
+
+    if (this.props.instanced) {
+      // Switch to instanced
+      if (!model || instanceIndex !== undefined) {
+        return;
+      }
+
+      if (this.loadedState?.group) {
+        this.container.remove(this.loadedState?.group);
+        this.loadedState.group.removeFromParent();
+      }
+
+      instanceIndex = this.getInstanceManager().registerModel(this.props.src, model, this);
+      this.setInstanceIndex(instanceIndex);
+    } else {
+      // Default
+      if (instanceIndex !== undefined) {
+        this.getInstanceManager().unregisterModel(this.props.src, instanceIndex);
+        this.setInstanceIndex(undefined);
+      }
+      if (this.loadedState?.group) {
+        this.container.add(this.loadedState.group);
       }
     }
   }
