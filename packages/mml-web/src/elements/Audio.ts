@@ -498,4 +498,8 @@ export class Audio extends TransformableElement {
     this.audioDebugConeX?.update();
     this.audioDebugConeY?.update();
   }
+
+  public getLoadedAudioState() {
+    return this.loadedAudioState;
+  }
 }

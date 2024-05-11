@@ -377,4 +377,8 @@ export class Video extends TransformableElement {
     this.applyBounds();
     this.collideableHelper.updateCollider(this.mesh);
   }
+
+  public getLoadedVideoState() {
+    return this.loadedVideoState;
+  }
 }

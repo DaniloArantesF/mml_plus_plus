@@ -16,6 +16,7 @@ import { Plane } from "./Plane";
 import { PositionProbe } from "./PositionProbe";
 import { Prompt } from "./Prompt";
 import { RemoteDocument } from "./RemoteDocument";
+import { Shader } from "./Shader";
 import { Sphere } from "./Sphere";
 import { Video } from "./Video";
 
@@ -42,4 +43,5 @@ export function registerCustomElementsToWindow(targetWindow: Window) {
   targetWindow.customElements.define(ChatProbe.tagName, ChatProbe);
   targetWindow.customElements.define(Interaction.tagName, Interaction);
   targetWindow.customElements.define(AttributeAnimation.tagName, AttributeAnimation);
+  targetWindow.customElements.define(Shader.tagName, Shader);
 }
