@@ -17,7 +17,6 @@ import {
 } from "../utils/shader-helpers";
 
 const FFT_BIN_COUNT = 512;
-const THREE_REVISION = THREE.REVISION;
 const defaultShaderType = "mesh";
 const defaultVideoWidth = 1;
 const defaultVideoHeight = 1;
@@ -107,7 +106,7 @@ varying vec3 vViewPosition;
 #include <map_pars_fragment>
 #include <alphamap_pars_fragment>
 #include <alphatest_pars_fragment>
-${THREE_REVISION === "154" ? "#include <alphahash_pars_fragment>" : ""}
+#include <alphahash_pars_fragment>
 #include <aomap_pars_fragment>
 #include <lightmap_pars_fragment>
 #include <emissivemap_pars_fragment>
@@ -158,7 +157,7 @@ void main() {
 	#include <color_fragment>
 	#include <alphamap_fragment>
 	#include <alphatest_fragment>
-  ${THREE_REVISION === "154" ? "#include <alphahash_fragment>" : ""}
+  #include <alphahash_fragment>
 	#include <roughnessmap_fragment>
 	#include <metalnessmap_fragment>
 	#include <normal_fragment_begin>
@@ -203,14 +202,13 @@ void main() {
 
 	#endif
 
-  ${THREE_REVISION === "154" ? "#include <opaque_fragment>" : "#include <output_fragment>"}
+  #include <opaque_fragment>
 	#include <tonemapping_fragment>
-  ${THREE_REVISION === "154" ? "#include <colorspace_fragment>" : "#include <encodings_fragment>"}
+  #include <colorspace_fragment>
 	#include <fog_fragment>
 	#include <premultiplied_alpha_fragment>
-	#include <dithering_fragment>
-}
-`;
+	// #include <dithering_fragment>
+}`;
 const baseVertexShader = `
 #define STANDARD
 
@@ -322,26 +320,12 @@ export class Shader extends TransformableElement {
     },
     type: (instance, newValue) => {
       const ogType = instance.props.type;
-      if (instance.isConnected) {
-        instance.props.type = newValue?.match(/(mesh|points)/)
-          ? (newValue as typeof instance.props.type)
-          : defaultShaderType;
+      instance.props.type = newValue?.match(/(mesh|points)/)
+        ? (newValue as typeof instance.props.type)
+        : defaultShaderType;
 
-        if (ogType !== instance.props.type) {
-          const geometry = instance.mesh.geometry;
-          const material = instance.mesh.material;
-          const oldMesh = instance.mesh;
-
-          if (instance.props.type === "points") {
-            instance.mesh = new THREE.Points(geometry, material);
-          } else {
-            instance.mesh = new THREE.Mesh(geometry, material);
-          }
-          instance.container.remove(oldMesh);
-          instance.container.add(instance.mesh);
-          instance.updateHeightAndWidth();
-        }
-        instance.updateMaterial();
+      if (instance.isConnected && ogType !== instance.props.type) {
+        instance.updateMeshType();
       }
     },
   });
@@ -444,7 +428,6 @@ export class Shader extends TransformableElement {
     material.onBeforeCompile = (shader) => {
       shader.uniforms = this.uniforms;
 
-      // TODO: avoid repeating this shit
       shader.vertexShader = this.updateVertexShader();
       shader.fragmentShader = this.updateFragmentShader();
 
@@ -463,6 +446,9 @@ export class Shader extends TransformableElement {
     this.container.add(this.mesh);
   }
 
+  /**
+   * Create shader buffers for texture shaders i.e. m-shader children
+   */
   public createShaderBuffers() {
     if (!this.loadedShaderState) {
       throw new Error("Trying to create shader buffers before loading shader");
@@ -618,6 +604,7 @@ export class Shader extends TransformableElement {
     if (insideMainVert && insideMainVert[insideMainVert.length - 1]) {
       vert = injectAfter(vert, "// insideMainBegin", insideMainVert[insideMainVert.length - 1]);
     }
+
     return vert;
   }
 
@@ -647,6 +634,9 @@ export class Shader extends TransformableElement {
     this.syncShaderTime();
   }
 
+  /*
+   * Updates the audio element being used for audio data
+   */
   private updateAudio() {
     if (!this.loadedAudioState) {
       let audioElement: THREE.PositionalAudio;
@@ -670,7 +660,6 @@ export class Shader extends TransformableElement {
         return;
       }
 
-      // TODO: traverse children of threeScene until you find the m-element-property.id === this.props.audio
       const analyser = new THREE.AudioAnalyser(audioElement, FFT_BIN_COUNT);
       const format = (this.getScene().getRenderer() as THREE.WebGLRenderer).capabilities.isWebGL2
         ? THREE.RedFormat
@@ -735,7 +724,8 @@ export class Shader extends TransformableElement {
     };
 
     // Check if shader is supposed to be a texture buffer
-    const isShaderChild = this.container.parent?.name === "_Shader";
+    const isShaderChild = this.container.parent?.name.startsWith("_Shader");
+
     if (isShaderChild) {
       this.container.remove(this.mesh);
       return;
@@ -749,7 +739,11 @@ export class Shader extends TransformableElement {
     }
 
     // this.parseCustomUniforms();
-    this.updateMaterial();
+    if (this.props.type !== defaultShaderType) {
+      this.updateMeshType();
+    } else {
+      this.updateMaterial();
+    }
 
     if (this.props.audio) {
       const audioTag = document.getElementById(this.props.audio) as Audio;
@@ -799,6 +793,30 @@ export class Shader extends TransformableElement {
   protected disable() {
     this.collideableHelper.disable();
     // this.syncVideoTime();
+  }
+
+  private updateMeshType() {
+    if (
+      (this.props.type === "mesh" && this.mesh instanceof THREE.Mesh) ||
+      (this.props.type === "points" && this.mesh instanceof THREE.Points)
+    ) {
+      return;
+    }
+    const geometry = this.mesh.geometry;
+    const material = this.mesh.material;
+    const oldMesh = this.mesh;
+
+    if (this.props.type === "points") {
+      this.mesh = new THREE.Points(geometry, material);
+    } else {
+      this.mesh = new THREE.Mesh(geometry, material);
+    }
+
+    this.container.remove(oldMesh);
+    this.container.add(this.mesh);
+
+    this.updateHeightAndWidth();
+    this.updateMaterial();
   }
 }
 
@@ -867,5 +885,4 @@ class ShaderBufferManager {
       this.swapBuffer(key);
     }
   }
-
 }
