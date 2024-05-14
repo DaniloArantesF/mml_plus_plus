@@ -11,7 +11,11 @@ import {
   defaultVertexShader,
 } from "../shaders/defaultShaders";
 import ShaderBufferManager, { ShaderBufferItem } from "../shaders/ShaderBuffer";
-import { AttributeHandler, parseFloatAttribute } from "../utils/attribute-handling";
+import {
+  AttributeHandler,
+  parseBoolAttribute,
+  parseFloatAttribute,
+} from "../utils/attribute-handling";
 import { CollideableHelper } from "../utils/CollideableHelper";
 import { OrientedBoundingBox } from "../utils/OrientedBoundingBox";
 import {
@@ -25,11 +29,16 @@ import {
 
 const FFT_BIN_COUNT = 512;
 const defaultShaderType = "mesh";
-const defaultVideoWidth = 1;
-const defaultVideoHeight = 1;
+const defaultShaderWidth = 1;
+const defaultShaderHeight = 1;
 const defaultCollisionInterval = null;
 const defaultAudioNode = null;
 const defaultVideoNode = null;
+const defaultFog = true;
+const defaultLights = true;
+const defaultDithering = true;
+const defaultDepthWrite = true;
+const defaultTransparent = true;
 
 export class Shader extends TransformableElement {
   static tagName = "m-shader";
@@ -49,13 +58,13 @@ export class Shader extends TransformableElement {
       }
     },
     width: (instance, newValue) => {
-      instance.props.width = parseFloatAttribute(newValue, defaultVideoWidth);
+      instance.props.width = parseFloatAttribute(newValue, defaultShaderWidth);
       if (instance.isConnected) {
         instance.updateHeightAndWidth();
       }
     },
     height: (instance, newValue) => {
-      instance.props.height = parseFloatAttribute(newValue, defaultVideoHeight);
+      instance.props.height = parseFloatAttribute(newValue, defaultShaderHeight);
       if (instance.isConnected) {
         instance.updateHeightAndWidth();
       }
@@ -84,6 +93,43 @@ export class Shader extends TransformableElement {
 
       if (instance.isConnected && ogType !== instance.props.type) {
         instance.updateMeshType();
+      }
+    },
+    fog: (instance, newValue) => {
+      instance.props.fog = parseBoolAttribute(newValue, defaultFog);
+      if (instance.material) {
+        instance.material.fog = instance.props.fog;
+        instance.updateUniforms();
+        instance.material.needsUpdate = true;
+      }
+    },
+    lights: (instance, newValue) => {
+      instance.props.lights = parseBoolAttribute(newValue, defaultLights);
+      if (instance.material) {
+        instance.material.lights = instance.props.lights;
+        instance.updateUniforms();
+        instance.material.needsUpdate = true;
+      }
+    },
+    dithering: (instance, newValue) => {
+      instance.props.dithering = parseBoolAttribute(newValue, defaultDithering);
+      if (instance.material) {
+        instance.material.dithering = instance.props.dithering;
+        instance.material.needsUpdate = true;
+      }
+    },
+    ["depth-write"]: (instance, newValue) => {
+      instance.props.depthWrite = parseBoolAttribute(newValue, defaultDepthWrite);
+      if (instance.material) {
+        instance.material.depthWrite = instance.props.depthWrite;
+        instance.material.needsUpdate = true;
+      }
+    },
+    transparent: (instance, newValue) => {
+      instance.props.transparent = parseBoolAttribute(newValue, defaultTransparent);
+      if (instance.material) {
+        instance.material.transparent = instance.props.transparent;
+        instance.material.needsUpdate = true;
       }
     },
   });
@@ -128,7 +174,8 @@ export class Shader extends TransformableElement {
   } | null = null;
 
   private uniforms: { [key: string]: { value: any } } = {};
-  private baseUniforms = /* glsl */ `
+  private baseUniforms: typeof this.uniforms = {};
+  private baseUniformsDeclarationString = /* glsl */ `
   #define BIN_COUNT ${(FFT_BIN_COUNT * 2) / 3}
   varying vec2 vUv;
   uniform float time;
@@ -141,34 +188,39 @@ export class Shader extends TransformableElement {
   private props = {
     vert: defaultVertexShader,
     frag: defaultFragShader,
-    width: defaultVideoWidth as number | null,
-    height: defaultVideoHeight as number | null,
+    width: defaultShaderWidth as number | null,
+    height: defaultShaderHeight as number | null,
     audio: defaultAudioNode as string | null,
     video: defaultVideoNode as string | null,
     probe: null as string | null,
     type: defaultShaderType as "mesh" | "points",
     collisionInterval: defaultCollisionInterval as string | null,
+    fog: defaultFog as boolean,
+    lights: defaultLights as boolean,
+    dithering: defaultDithering as boolean,
+    depthWrite: defaultDepthWrite as boolean,
+    transparent: defaultTransparent as boolean,
   };
 
   constructor() {
     super();
 
     // Setup default uniforms
-    this.uniforms.mouse = { value: new THREE.Vector2(0, 0) };
-    this.uniforms.time = { value: 0.0 };
-    this.uniforms.fft = { value: 0.0 };
-    this.uniforms.fftTexture = { value: null };
-    this.uniforms.resolution = {
+    this.baseUniforms.mouse = { value: new THREE.Vector2(0, 0) };
+    this.baseUniforms.time = { value: 0.0 };
+    this.baseUniforms.fft = { value: 0.0 };
+    this.baseUniforms.fftTexture = { value: null };
+    this.baseUniforms.resolution = {
       value: new THREE.Vector2(window.innerWidth, window.innerHeight),
     };
-    this.uniforms.metalness = { value: 0.0 };
-    this.uniforms.roughness = { value: 1.0 };
-    this.uniforms.opacity = { value: 1.0 };
+    this.baseUniforms.metalness = { value: 0.0 };
+    this.baseUniforms.roughness = { value: 1.0 };
+    this.baseUniforms.opacity = { value: 1.0 };
 
     this.uniforms = THREE.UniformsUtils.merge([
-      this.uniforms,
-      THREE.UniformsLib["lights"],
-      THREE.UniformsLib["fog"],
+      this.baseUniforms,
+      this.props.lights ? THREE.UniformsLib["lights"] : {},
+      this.props.fog ? THREE.UniformsLib["fog"] : {},
     ]);
   }
 
@@ -178,11 +230,11 @@ export class Shader extends TransformableElement {
       fragmentShader: baseFragShader,
       uniforms: this.uniforms,
       side: THREE.DoubleSide,
-      fog: true,
-      lights: true,
-      dithering: true,
-      depthWrite: true,
-      transparent: true,
+      fog: this.props.fog,
+      lights: this.props.lights,
+      dithering: this.props.dithering,
+      depthWrite: this.props.depthWrite,
+      transparent: this.props.transparent,
     });
 
     this.material.onBeforeCompile = (shader) => {
@@ -191,8 +243,8 @@ export class Shader extends TransformableElement {
       shader.vertexShader = this.updateVertexShader();
       shader.fragmentShader = this.updateFragmentShader();
 
-      shader.vertexShader = injectTop(shader.vertexShader, this.baseUniforms);
-      shader.fragmentShader = injectTop(shader.fragmentShader, this.baseUniforms);
+      shader.vertexShader = injectTop(shader.vertexShader, this.baseUniformsDeclarationString);
+      shader.fragmentShader = injectTop(shader.fragmentShader, this.baseUniformsDeclarationString);
     };
   }
 
@@ -233,9 +285,12 @@ export class Shader extends TransformableElement {
       });
       material.onBeforeCompile = (shader) => {
         shader.uniforms = this.uniforms;
-        shader.vertexShader = injectTop(shader.vertexShader, this.baseUniforms);
+        shader.vertexShader = injectTop(shader.vertexShader, this.baseUniformsDeclarationString);
         shader.vertexShader = injectInsideMain(shader.vertexShader, "vUv = uv;");
-        shader.fragmentShader = injectTop(shader.fragmentShader, this.baseUniforms);
+        shader.fragmentShader = injectTop(
+          shader.fragmentShader,
+          this.baseUniformsDeclarationString,
+        );
       };
 
       const readTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
@@ -335,7 +390,9 @@ export class Shader extends TransformableElement {
     if (this.loadedAudioState) {
       // Update fftTexture
       this.loadedAudioState.analyser.getFrequencyData();
-      this.uniforms.fftTexture.value.needsUpdate = true;
+      if (this.uniforms.fftTexture.value) {
+        this.uniforms.fftTexture.value.needsUpdate = true;
+      }
 
       // Update fft average value
       this.loadedAudioState.fft.value = this.loadedAudioState.analyser.getAverageFrequency();
@@ -614,5 +671,16 @@ export class Shader extends TransformableElement {
 
     this.updateHeightAndWidth();
     this.updateMaterial();
+  }
+
+  private updateUniforms() {
+    const uniforms = [this.baseUniforms];
+    if (this.props.lights) {
+      uniforms.push(THREE.UniformsLib["lights"]);
+    }
+    if (this.props.fog) {
+      uniforms.push(THREE.UniformsLib["lights"]);
+    }
+    this.uniforms = THREE.UniformsUtils.merge(uniforms);
   }
 }
