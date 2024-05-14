@@ -25,10 +25,14 @@ export default class ShaderBufferManager {
     this.scene.add(this.mesh);
   }
 
+  /**
+   * Each texture buffer is added sequentially following the pattern bellow
+   */
   public static getBufferKey(id: number) {
     return `prgm${id}Texture`;
   }
 
+  // TODO: dispose of old buffers if set
   public setBuffers(buffers: ShaderBufferItem[]) {
     buffers.forEach((b, i) => this.targets.set(ShaderBufferManager.getBufferKey(i + 1), b));
   }
@@ -67,9 +71,10 @@ export default class ShaderBufferManager {
   }
 
   public dispose() {
-    for (const [, { readTarget, writeTarget }] of this.targets) {
+    for (const [, { readTarget, writeTarget, material }] of this.targets) {
       readTarget.dispose();
       writeTarget.dispose();
+      material.dispose();
     }
   }
 }

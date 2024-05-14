@@ -99,6 +99,7 @@ export class Shader extends TransformableElement {
   private mesh:
     | THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
     | THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  private material: THREE.ShaderMaterial | null = null;
 
   private collideableHelper = new CollideableHelper(this);
   private clock = new THREE.Clock();
@@ -111,6 +112,10 @@ export class Shader extends TransformableElement {
 
     hasBuffers: boolean;
     bufferManager?: ShaderBufferManager;
+
+    animationRequestId: number;
+
+    parent: Shader | null;
   } | null = null;
 
   private loadedAudioState: {
@@ -167,9 +172,8 @@ export class Shader extends TransformableElement {
     ]);
   }
 
-  public createShaderMesh() {
-    const geometry = new THREE.PlaneGeometry(1, 1, 50, 50);
-    const material = new THREE.ShaderMaterial({
+  private createShaderMaterial() {
+    this.material = new THREE.ShaderMaterial({
       vertexShader: baseVertexShader,
       fragmentShader: baseFragShader,
       uniforms: this.uniforms,
@@ -181,7 +185,7 @@ export class Shader extends TransformableElement {
       transparent: true,
     });
 
-    material.onBeforeCompile = (shader) => {
+    this.material.onBeforeCompile = (shader) => {
       shader.uniforms = this.uniforms;
 
       shader.vertexShader = this.updateVertexShader();
@@ -190,11 +194,18 @@ export class Shader extends TransformableElement {
       shader.vertexShader = injectTop(shader.vertexShader, this.baseUniforms);
       shader.fragmentShader = injectTop(shader.fragmentShader, this.baseUniforms);
     };
+  }
+
+  public createShaderMesh() {
+    if (!this.material) {
+      throw new Error("Shader material is undefined");
+    }
+    const geometry = new THREE.PlaneGeometry(1, 1, 50, 50);
 
     if (this.props.type === "points") {
-      this.mesh = new THREE.Points(geometry, material);
+      this.mesh = new THREE.Points(geometry, this.material);
     } else {
-      this.mesh = new THREE.Mesh(geometry, material);
+      this.mesh = new THREE.Mesh(geometry, this.material);
     }
 
     this.updateHeightAndWidth();
@@ -207,8 +218,8 @@ export class Shader extends TransformableElement {
   /**
    * Create shader buffers for texture shaders i.e. m-shader children
    */
-  public createShaderBuffers() {
-    if (!this.loadedShaderState) {
+  public updateShaderBuffers() {
+    if (!this.loadedShaderState || !this.loadedShaderState.bufferManager) {
       throw new Error("Trying to create shader buffers before loading shader");
     }
 
@@ -237,9 +248,6 @@ export class Shader extends TransformableElement {
       return { material, readTarget, writeTarget };
     });
 
-    this.loadedShaderState.bufferManager = new ShaderBufferManager(
-      this.getScene().getRenderer() as THREE.WebGLRenderer,
-    );
     this.loadedShaderState.bufferManager.setBuffers(textureMaterials);
   }
 
@@ -317,8 +325,8 @@ export class Shader extends TransformableElement {
   }
 
   private render() {
-    requestAnimationFrame(this.render.bind(this));
     if (!this.uniforms || !this.loadedShaderState) return;
+    this.loadedShaderState.animationRequestId = requestAnimationFrame(this.render.bind(this));
 
     // Add the time difference to the local clock time.
     this.uniforms.time.value = this.clock.getElapsedTime() + this.loadedShaderState.timeDifference;
@@ -384,12 +392,23 @@ export class Shader extends TransformableElement {
   }
 
   private updateMaterial() {
-    (this.mesh.material as THREE.ShaderMaterial).fragmentShader = this.updateFragmentShader();
-
-    (this.mesh.material as THREE.ShaderMaterial).vertexShader = this.updateVertexShader();
-
-    (this.mesh.material as THREE.ShaderMaterial).needsUpdate = true;
+    if (this.material) {
+      (this.material as THREE.ShaderMaterial).fragmentShader = this.updateFragmentShader();
+      (this.material as THREE.ShaderMaterial).vertexShader = this.updateVertexShader();
+      (this.material as THREE.ShaderMaterial).needsUpdate = true;
+    }
     this.syncShaderTime();
+
+    // Update main shader if this is a texture buffer
+    const isChildShader = this.parentElement?.tagName.toLowerCase() === Shader.tagName;
+    if (isChildShader) {
+      const mainShader = this.parentElement as Shader;
+      if (!mainShader.loadedShaderState?.bufferManager) {
+        throw new Error("Main shader does not have buffer manager");
+      }
+      mainShader.updateShaderBuffers();
+      mainShader.updateMaterial();
+    }
   }
 
   /*
@@ -479,21 +498,27 @@ export class Shader extends TransformableElement {
     this.loadedShaderState = {
       hasBuffers: false,
       timeDifference: 0,
+      animationRequestId: -1,
+      parent: null,
     };
 
     // Check if shader is supposed to be a texture buffer
     const isShaderChild = this.parentElement?.tagName.toLowerCase() === Shader.tagName;
     if (isShaderChild) {
+      this.loadedShaderState.parent = this.parentElement as Shader;
       return;
     }
 
+    this.createShaderMaterial();
     this.createShaderMesh();
 
     // Check if shader has texture buffers
-    // At this moment, the children won't be present in the scene yet, so we use querySelector
     this.loadedShaderState.hasBuffers = this.querySelectorAll("m-shader").length > 0;
     if (this.loadedShaderState.hasBuffers) {
-      this.createShaderBuffers();
+      this.loadedShaderState.bufferManager = new ShaderBufferManager(
+        this.getScene().getRenderer() as THREE.WebGLRenderer,
+      );
+      this.updateShaderBuffers();
     }
 
     // this.parseCustomUniforms();
@@ -524,6 +549,20 @@ export class Shader extends TransformableElement {
   disconnectedCallback() {
     this.documentTimeListener.remove();
     this.collideableHelper.removeColliders();
+
+    if (this.material) {
+      this.material.dispose();
+      this.material = null;
+    }
+    if (this.mesh) {
+      this.container.remove(this.mesh);
+      this.mesh.geometry.dispose();
+    }
+
+    cancelAnimationFrame(this.loadedShaderState?.animationRequestId || -1);
+    this.loadedShaderState?.bufferManager?.dispose();
+    this.loadedShaderState = null;
+
     super.disconnectedCallback();
   }
 
@@ -545,12 +584,12 @@ export class Shader extends TransformableElement {
 
   protected enable() {
     this.collideableHelper.enable();
-    // this.syncVideoTime();
+    this.syncShaderTime();
   }
 
   protected disable() {
     this.collideableHelper.disable();
-    // this.syncVideoTime();
+    this.syncShaderTime();
   }
 
   private updateMeshType() {
