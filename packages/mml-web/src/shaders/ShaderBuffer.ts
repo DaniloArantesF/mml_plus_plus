@@ -50,7 +50,6 @@ export default class ShaderBufferManager {
       this.renderer.render(this.scene, this.camera);
     }
     this.renderer.setRenderTarget(null);
-    this.renderer.autoClear = true;
 
     this.swapBuffers();
   }
