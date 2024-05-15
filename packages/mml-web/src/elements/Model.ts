@@ -267,28 +267,15 @@ export class Model extends TransformableElement {
   }
 
   private setSrc(newValue: string | null): void {
-    console.log(`🛠 setSrc()`);
-    // console.log({
-    //   loadedState: this.loadedState,
-    //   src: newValue,
-    //   instanceIndex: this.getInstanceIndex(),
-    //   connected: this.isConnected
-    // });
-
     const oldValue = this.props.src;
     this.props.src = (newValue || "").trim();
     if (this.loadedState !== null) {
-      console.log(`🟨 Disposing LOADED_STATE`);
-
-      console.log(newValue);
       // Re-register with new src
       const instanceIndex = this.getInstanceIndex();
       if (instanceIndex !== undefined) {
         this.getInstanceManager().unregisterModel(oldValue, instanceIndex);
         this.setInstanceIndex(undefined);
       }
-
-      // this.getInstanceManager().registerModel(this.props.src, this.loadedState.group, this);
 
       this.collideableHelper.removeColliders();
       this.loadedState.group.removeFromParent();
@@ -461,7 +448,6 @@ export class Model extends TransformableElement {
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
     super.attributeChangedCallback(name, oldValue, newValue);
-    console.log(name, oldValue, newValue);
     Model.attributeHandler.handle(this, name, newValue);
     this.collideableHelper.handle(name, newValue);
   }
@@ -480,7 +466,6 @@ export class Model extends TransformableElement {
   }
 
   disconnectedCallback() {
-    console.log(`🟥 disconnectedCallback() on ${this.props.src}`);
     // stop listening to document time ticking
     if (this.documentTimeTickListener) {
       this.documentTimeTickListener.remove();
@@ -633,7 +618,6 @@ export class Model extends TransformableElement {
   }
 
   private updateMeshType() {
-    console.info(`🟥 updateMeshType() on ${this.props.src}`);
     const model = Model.modelCache.get(this.props.src);
 
     let instanceIndex = this.getInstanceIndex();
