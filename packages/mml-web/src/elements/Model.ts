@@ -267,7 +267,7 @@ export class Model extends TransformableElement {
   }
 
   private setSrc(newValue: string | null): void {
-    // console.log(`🛠 setSrc()`);
+    console.log(`🛠 setSrc()`);
     // console.log({
     //   loadedState: this.loadedState,
     //   src: newValue,
@@ -275,8 +275,21 @@ export class Model extends TransformableElement {
     //   connected: this.isConnected
     // });
 
+    const oldValue = this.props.src;
     this.props.src = (newValue || "").trim();
     if (this.loadedState !== null) {
+      console.log(`🟨 Disposing LOADED_STATE`);
+
+      console.log(newValue);
+      // Re-register with new src
+      const instanceIndex = this.getInstanceIndex();
+      if (instanceIndex !== undefined) {
+        this.getInstanceManager().unregisterModel(oldValue, instanceIndex);
+        this.setInstanceIndex(undefined);
+      }
+
+      // this.getInstanceManager().registerModel(this.props.src, this.loadedState.group, this);
+
       this.collideableHelper.removeColliders();
       this.loadedState.group.removeFromParent();
       Model.disposeOfGroup(this.loadedState.group);
@@ -333,12 +346,10 @@ export class Model extends TransformableElement {
         // Instance handling
         if (!hasSkinnedMesh) {
           const cachedGroup = Model.modelCache.get(this.props.src);
-          if (cachedGroup) {
-            this.updateMeshType();
-          } else {
+          if (!cachedGroup) {
             Model.modelCache.set(this.props.src, result.group.clone()); // Cache the original group for future instances
-            this.updateMeshType();
           }
+          this.updateMeshType();
         } else {
           this.container.add(result.group); // Add non-instanced if skinned mesh
         }
@@ -450,6 +461,7 @@ export class Model extends TransformableElement {
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
     super.attributeChangedCallback(name, oldValue, newValue);
+    console.log(name, oldValue, newValue);
     Model.attributeHandler.handle(this, name, newValue);
     this.collideableHelper.handle(name, newValue);
   }
@@ -468,7 +480,7 @@ export class Model extends TransformableElement {
   }
 
   disconnectedCallback() {
-    // console.log(`🟥 disconnectedCallback()`);
+    console.log(`🟥 disconnectedCallback() on ${this.props.src}`);
     // stop listening to document time ticking
     if (this.documentTimeTickListener) {
       this.documentTimeTickListener.remove();
@@ -621,8 +633,9 @@ export class Model extends TransformableElement {
   }
 
   private updateMeshType() {
-    // console.info(`🟥 updateMeshType()`);
+    console.info(`🟥 updateMeshType() on ${this.props.src}`);
     const model = Model.modelCache.get(this.props.src);
+
     let instanceIndex = this.getInstanceIndex();
 
     if (this.props.instanced) {
@@ -632,7 +645,6 @@ export class Model extends TransformableElement {
       }
 
       if (this.loadedState?.group) {
-        this.container.remove(this.loadedState?.group);
         this.loadedState.group.removeFromParent();
       }
 

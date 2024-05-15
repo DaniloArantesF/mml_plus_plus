@@ -6,7 +6,6 @@ import { Model } from "./Model";
 type ModelInstanceData = {
   count: number;
   group: THREE.Group;
-  meshes: Record<string, THREE.InstancedMesh>;
   original: THREE.Group;
   parentMap: Map<number, Model>;
 };
@@ -63,13 +62,15 @@ class InstancedMeshManager {
 
     if (modelData !== undefined) {
       newIndex = modelData.count++;
-      modelData.original.children.forEach((child) => {
-        this.setInstancedModelMatrix(modelData!, newIndex, child, parent.getInstanceMatrix());
-      });
+
+      // update these before calling update model
+      modelData.parentMap.set(newIndex, parent);
+      this.modelMap.set(key, modelData);
+
+      this.updateModel(key, newIndex);
     } else {
       modelData = {
         original: model,
-        meshes: {},
         count: 1,
         group: new THREE.Group(),
         parentMap: new Map(),
@@ -77,23 +78,22 @@ class InstancedMeshManager {
       newIndex = 0;
 
       // Create an instanced mesh per mesh in the model
-      modelData.meshes = model.children.reduce(
-        (acc, child) => {
-          const instancedMesh = this.cloneInstanced(child, parent.getInstanceMatrix());
-          instancedMesh.count = 1;
-          modelData!.group.add(instancedMesh);
+      traverseImmediateMeshChildren(model, (child) => {
+        const mesh = new THREE.InstancedMesh(child.geometry, child.material, 1024);
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        mesh.name = child.name;
+        mesh.count = 1;
 
-          return {
-            ...acc,
-            [child.name]: instancedMesh,
-          };
-        },
-        {} as Record<string, THREE.InstancedMesh>,
-      );
+        const clone = child.clone();
+        clone.applyMatrix4(parent.getInstanceMatrix());
+        mesh.setMatrixAt(0, clone.matrix);
+        mesh.instanceMatrix.needsUpdate = true;
+        modelData?.group.add(mesh);
+      });
+
       this.scene?.add(modelData.group);
     }
 
-    // console.log(`🟩 Registering ${newIndex}`);
     modelData.parentMap.set(newIndex, parent);
     this.modelMap.set(key, modelData);
 
@@ -101,29 +101,40 @@ class InstancedMeshManager {
   }
 
   public unregisterModel(key: string, index: number) {
-    // console.log(`🟥 Unregistering ${index}`)
-    const modelData = this.modelMap.get(key); //
+    const modelData = this.modelMap.get(key);
     if (modelData === undefined) {
       return;
     }
 
     modelData.count--;
     if (modelData.count === 0) {
-      // console.log(`🟥 Removing instanced mesh`)
-      // Remove the instanced mesh
       this.scene?.remove(modelData.group);
       this.modelMap.delete(key);
-      this.parentMap.delete(index);
     } else {
       // Update each instanced mesh to remove the instance at the given index
-      const meshes = Object.keys(modelData.meshes);
-      meshes.forEach((meshName) => {
-        const instancedMesh = modelData.meshes[meshName];
-        instancedMesh.setMatrixAt(index, new THREE.Matrix4());
-        instancedMesh.count = modelData.count;
-        instancedMesh.instanceMatrix.needsUpdate = true;
+      traverseImmediateMeshChildren(modelData.group, (mesh) => {
+        if (!(mesh instanceof THREE.InstancedMesh)) {
+          return;
+        }
+
+        // Shift instances after the removed index
+        const curMatrix = new THREE.Matrix4();
+        for (let i = index + 1; i <= modelData.count; i++) {
+          mesh.getMatrixAt(i, curMatrix);
+          mesh.setMatrixAt(i - 1, curMatrix);
+          const parent = modelData.parentMap.get(i);
+          if (parent) {
+            parent.setInstanceIndex(i - 1);
+            modelData.parentMap.set(i - 1, parent);
+            modelData.parentMap.delete(i);
+          }
+        }
+
+        modelData.parentMap.delete(modelData.count);
+        mesh.count = modelData.count;
+        mesh.instanceMatrix.needsUpdate = true;
       });
-      this.parentMap.delete(index);
+      // this.parentMap.delete(index);
     }
   }
 
@@ -132,33 +143,24 @@ class InstancedMeshManager {
   private setInstancedModelMatrix(
     modelData: ModelInstanceData,
     index: number,
-    object: THREE.Object3D,
     parentTransform: THREE.Matrix4,
   ) {
-    return traverseImmediateMeshChildren(object, (child) => {
-      const clone = child.clone();
-      clone.applyMatrix4(parentTransform);
-      modelData.meshes[child.name].count = modelData.count;
-      modelData.meshes[child.name].setMatrixAt(index, clone.matrix);
-      modelData.meshes[child.name].instanceMatrix.needsUpdate = true;
-    });
-  }
+    return traverseImmediateMeshChildren(modelData.original, (child) => {
+      const mesh = modelData.group.children.find(
+        (m) => m.name === child.name,
+      ) as THREE.InstancedMesh;
+      if (!mesh) {
+        return;
+      }
 
-  private cloneInstanced(
-    object: THREE.Object3D,
-    parentTransform: THREE.Matrix4,
-  ): THREE.InstancedMesh {
-    const clone = object.clone();
-    clone.applyMatrix4(parentTransform);
+      const offsetMatrix = new THREE.Matrix4();
+      offsetMatrix.copy(parentTransform);
+      offsetMatrix.multiply(child.matrix);
 
-    if (clone instanceof THREE.Mesh) {
-      const mesh = new THREE.InstancedMesh(clone.geometry, clone.material, 1024);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.setMatrixAt(0, clone.matrix);
+      mesh.setMatrixAt(index, offsetMatrix);
+      mesh.count = modelData.count;
       mesh.instanceMatrix.needsUpdate = true;
-      return mesh;
-    }
-    return this.cloneInstanced(clone, parentTransform);
+    });
   }
 
   public register(matrix: THREE.Matrix4, color: THREE.Color, parent: MElement): number {
@@ -205,10 +207,7 @@ class InstancedMeshManager {
     if (!modelData || !parent) {
       return;
     }
-
-    traverseImmediateMeshChildren(modelData.original, (child) => {
-      this.setInstancedModelMatrix(modelData, index, child, parent.getInstanceMatrix());
-    });
+    this.setInstancedModelMatrix(modelData, index, parent.getInstanceMatrix());
   }
 
   public updateTransform(
@@ -256,9 +255,9 @@ export default InstancedMeshManager;
 
 function traverseImmediateMeshChildren(
   object: THREE.Object3D,
-  callback: (object: THREE.Mesh) => void,
+  callback: (object: THREE.Mesh | THREE.InstancedMesh) => void,
 ) {
-  if (object instanceof THREE.Mesh) {
+  if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
     return callback(object);
   }
   object.children.forEach((child) => {

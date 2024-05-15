@@ -372,9 +372,9 @@ export abstract class TransformableElement extends MElement {
     const instanceManager = this.getInstanceManager();
     const instanceIndex = this.getInstanceIndex()!;
     switch (this.tagName) {
-      case 'M-MODEL':
+      case "M-MODEL":
         return instanceManager.updateModel(this.getAttribute("src")!, instanceIndex);
-      case 'M-CUBE':
+      case "M-CUBE":
         return instanceManager.updateTransform(
           instanceIndex,
           this.container.position.clone(),
