@@ -28,6 +28,8 @@ import {
 } from "../utils/shader-helpers";
 
 const FFT_BIN_COUNT = 512;
+const MAX_SHADER_TEXTURES = 8;
+
 const defaultShaderType = "mesh";
 const defaultShaderWidth = 1;
 const defaultShaderHeight = 1;
@@ -173,9 +175,9 @@ export class Shader extends TransformableElement {
     fftSize: number;
   } | null = null;
 
-  private uniforms: { [key: string]: { value: any } } = {};
-  private baseUniforms: typeof this.uniforms = {};
-  private textureUniforms: { [key: string]: { value: any } } = {};
+  private uniforms: { [key: string]: THREE.IUniform } = {};
+  private baseUniforms: { [key: string]: THREE.IUniform } = {};
+  private textureUniforms: { [key: string]: THREE.IUniform } = {};
 
   private baseUniformsDeclarationString = /* glsl */ `
   #define BIN_COUNT ${(FFT_BIN_COUNT * 2) / 3}
@@ -208,19 +210,25 @@ export class Shader extends TransformableElement {
     super();
 
     // Setup default uniforms
-    this.baseUniforms.mouse = { value: new THREE.Vector2(0, 0) };
-    this.baseUniforms.time = { value: 0.0 };
-    this.baseUniforms.fft = { value: 0.0 };
-    this.baseUniforms.fftTexture = { value: null };
-    this.baseUniforms.resolution = {
-      value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-    };
-    this.baseUniforms.metalness = { value: 0.0 };
-    this.baseUniforms.roughness = { value: 1.0 };
-    this.baseUniforms.opacity = { value: 1.0 };
+    this.baseUniforms.mouse = new THREE.Uniform(new THREE.Vector2(0, 0));
+    this.baseUniforms.time = new THREE.Uniform(0.0);
+    this.baseUniforms.fft = new THREE.Uniform(0.0);
+    this.baseUniforms.fftTexture = new THREE.Uniform(null);
+    this.baseUniforms.resolution = new THREE.Uniform(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+    );
+    this.baseUniforms.metalness = new THREE.Uniform(0.0);
+    this.baseUniforms.roughness = new THREE.Uniform(1.0);
+    this.baseUniforms.opacity = new THREE.Uniform(1.0);
+
+    this.textureUniforms = {};
+    Array.from({ length: MAX_SHADER_TEXTURES }, (_, i) => {
+      this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)] = new THREE.Uniform(null);
+    });
 
     this.uniforms = THREE.UniformsUtils.merge([
       this.baseUniforms,
+      this.textureUniforms,
       this.props.lights ? THREE.UniformsLib["lights"] : {},
       THREE.UniformsLib["fog"],
     ]);
@@ -299,16 +307,12 @@ export class Shader extends TransformableElement {
       const readTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
       const writeTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
-      this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)] = {
-        value: readTarget.texture,
-      };
-      this.uniforms[ShaderBufferManager.getBufferKey(i + 1)] = {
-        value: this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)].value,
-      };
+      this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)].value = readTarget.texture;
 
       return { material, readTarget, writeTarget };
     });
 
+    this.loadedShaderState.bufferManager.dispose();
     this.loadedShaderState.bufferManager.setBuffers(textureMaterials);
   }
 
