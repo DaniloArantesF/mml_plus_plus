@@ -97,7 +97,7 @@ export class Shader extends TransformableElement {
     },
     fog: (instance, newValue) => {
       instance.props.fog = parseBoolAttribute(newValue, defaultFog);
-      if (instance.material) {
+      if (instance.material && instance.material.fog !== instance.props.fog) {
         instance.material.fog = instance.props.fog;
         instance.updateUniforms();
         instance.material.needsUpdate = true;
@@ -105,7 +105,7 @@ export class Shader extends TransformableElement {
     },
     lights: (instance, newValue) => {
       instance.props.lights = parseBoolAttribute(newValue, defaultLights);
-      if (instance.material) {
+      if (instance.material && instance.material.lights !== instance.props.lights) {
         instance.material.lights = instance.props.lights;
         instance.updateUniforms();
         instance.material.needsUpdate = true;
@@ -175,6 +175,8 @@ export class Shader extends TransformableElement {
 
   private uniforms: { [key: string]: { value: any } } = {};
   private baseUniforms: typeof this.uniforms = {};
+  private textureUniforms: { [key: string]: { value: any } } = {};
+
   private baseUniformsDeclarationString = /* glsl */ `
   #define BIN_COUNT ${(FFT_BIN_COUNT * 2) / 3}
   varying vec2 vUv;
@@ -220,7 +222,7 @@ export class Shader extends TransformableElement {
     this.uniforms = THREE.UniformsUtils.merge([
       this.baseUniforms,
       this.props.lights ? THREE.UniformsLib["lights"] : {},
-      this.props.fog ? THREE.UniformsLib["fog"] : {},
+      THREE.UniformsLib["fog"],
     ]);
   }
 
@@ -276,6 +278,7 @@ export class Shader extends TransformableElement {
     }
 
     const shaders = [...Array.from(this.querySelectorAll("m-shader"))] as Shader[];
+    this.loadedShaderState.hasBuffers = shaders.length > 0;
 
     const textureMaterials: ShaderBufferItem[] = shaders.map((shader, i) => {
       const material = new THREE.ShaderMaterial({
@@ -296,8 +299,11 @@ export class Shader extends TransformableElement {
       const readTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
       const writeTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
-      this.uniforms[ShaderBufferManager.getBufferKey(i + 1)] = {
+      this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)] = {
         value: readTarget.texture,
+      };
+      this.uniforms[ShaderBufferManager.getBufferKey(i + 1)] = {
+        value: this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)].value,
       };
 
       return { material, readTarget, writeTarget };
@@ -448,7 +454,35 @@ export class Shader extends TransformableElement {
     return frag;
   }
 
+  private updateParentShader() {
+    if (this.loadedShaderState?.parent !== this.parentElement) {
+      throw new Error("Parent shader does not match parent element");
+    }
+
+    const mainShader = this.loadedShaderState.parent;
+    if (!mainShader?.loadedShaderState) {
+      throw new Error("Main shader does not have loaded shader state");
+    }
+
+    // We are adding a texture to a childless shader
+    if (!mainShader?.loadedShaderState?.bufferManager) {
+      mainShader.loadedShaderState.bufferManager = new ShaderBufferManager(
+        this.getScene().getRenderer() as THREE.WebGLRenderer,
+      );
+    }
+
+    // Update parent material
+    if (mainShader) {
+      mainShader.updateShaderBuffers();
+      mainShader.updateMaterial();
+    }
+  }
+
   private updateMaterial() {
+    if (this.loadedShaderState?.parent && this.loadedShaderState?.parent !== this.parentElement) {
+      throw new Error("Parent shader does not match parent element");
+    }
+
     if (this.material) {
       (this.material as THREE.ShaderMaterial).fragmentShader = this.updateFragmentShader();
       (this.material as THREE.ShaderMaterial).vertexShader = this.updateVertexShader();
@@ -459,12 +493,7 @@ export class Shader extends TransformableElement {
     // Update main shader if this is a texture buffer
     const isChildShader = this.parentElement?.tagName.toLowerCase() === Shader.tagName;
     if (isChildShader) {
-      const mainShader = this.parentElement as Shader;
-      if (!mainShader.loadedShaderState?.bufferManager) {
-        throw new Error("Main shader does not have buffer manager");
-      }
-      mainShader.updateShaderBuffers();
-      mainShader.updateMaterial();
+      this.updateParentShader();
     }
   }
 
@@ -563,6 +592,7 @@ export class Shader extends TransformableElement {
     const isShaderChild = this.parentElement?.tagName.toLowerCase() === Shader.tagName;
     if (isShaderChild) {
       this.loadedShaderState.parent = this.parentElement as Shader;
+      this.updateParentShader();
       return;
     }
 
@@ -617,6 +647,11 @@ export class Shader extends TransformableElement {
     }
 
     cancelAnimationFrame(this.loadedShaderState?.animationRequestId || -1);
+
+    if (this.loadedShaderState?.parent) {
+      // this.loadedShaderState.parent.updateShaderBuffers();
+      // this.loadedShaderState.parent.updateMaterial();
+    }
     this.loadedShaderState?.bufferManager?.dispose();
     this.loadedShaderState = null;
 
@@ -674,13 +709,14 @@ export class Shader extends TransformableElement {
   }
 
   private updateUniforms() {
-    const uniforms = [this.baseUniforms];
+    const uniforms = [this.baseUniforms, THREE.UniformsLib["fog"]];
     if (this.props.lights) {
       uniforms.push(THREE.UniformsLib["lights"]);
     }
-    if (this.props.fog) {
-      uniforms.push(THREE.UniformsLib["lights"]);
-    }
-    this.uniforms = THREE.UniformsUtils.merge(uniforms);
+
+    this.uniforms = {
+      ...THREE.UniformsUtils.merge(uniforms),
+      ...this.textureUniforms,
+    };
   }
 }

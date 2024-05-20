@@ -32,7 +32,6 @@ export default class ShaderBufferManager {
     return `prgm${id}Texture`;
   }
 
-  // TODO: dispose of old buffers if set
   public setBuffers(buffers: ShaderBufferItem[]) {
     buffers.forEach((b, i) => this.targets.set(ShaderBufferManager.getBufferKey(i + 1), b));
   }
