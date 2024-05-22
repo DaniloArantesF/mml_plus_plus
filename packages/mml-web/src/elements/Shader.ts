@@ -719,4 +719,8 @@ export class Shader extends TransformableElement {
       ...this.textureUniforms,
     };
   }
+
+  public getShader(): THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null {
+    return this.mesh as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  }
 }

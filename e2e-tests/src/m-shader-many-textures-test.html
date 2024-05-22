@@ -1,0 +1,47 @@
+<m-light type="point" intensity="900" x="0" y="15" z="15"></m-light>
+<m-shader
+  id="many-textures-shader"
+  width="10"
+  height="10"
+  y="5"
+  frag="
+    uniform sampler2D prgm1Texture;
+    void main() {
+      gl_FragColor = vec4(texture(prgm1Texture, vUv).xyz, 1.0);
+    }
+    "
+>
+  <m-shader
+    frag="
+    uniform sampler2D prgm3Texture;
+    void main() {
+      float quadrant = step(vUv.x, 0.5) * step(1.0 - vUv.y, 0.5);
+      vec3 color = texture2D(prgm3Texture, vUv).xyz + vec3(quadrant, 0.0, 0.0);
+      gl_FragColor = vec4(color, 0.0);
+    }
+    "
+  >
+  </m-shader>
+  <m-shader
+    frag="
+    uniform sampler2D prgm3Texture;
+    void main() {
+      float quadrant = step(vUv.x, 0.5) * step(vUv.y, 0.5);
+      vec3 color = texture2D(prgm3Texture, vUv).xyz + vec3(0., quadrant, 0.);
+      gl_FragColor = vec4(color, 0.0);
+    }
+    "
+  >
+  </m-shader>
+  <m-shader
+    frag="
+    uniform sampler2D prgm2Texture;
+    void main() {
+      float quadrant = step(1.0 - vUv.x, 0.5) * step(1.0 - vUv.y, 0.5);
+      vec3 color = texture2D(prgm2Texture, vUv).xyz + vec3(0.0, 0., quadrant);
+      gl_FragColor = vec4(color, 0.0);
+    }
+    "
+  >
+  </m-shader>
+</m-shader>
