@@ -1,0 +1,44 @@
+<m-light type="point" intensity="900" x="0" y="15" z="15"></m-light>
+<m-shader
+  id="single-texture-shader"
+  width="10"
+  height="10"
+  y="5"
+  frag="
+  uniform sampler2D prgm1Texture;
+  void main() {
+    gl_FragColor = vec4(texture(prgm1Texture, vUv).xyz, 1.0);
+  }
+  "
+>
+  <m-shader
+    frag="
+      void main() {
+        vec2 uv = 2. * vUv;
+        vec3 color = vec3(fract(uv), 0.0);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    "
+  >
+  </m-shader>
+</m-shader>
+
+<script>
+  const element = document.querySelector("#single-texture-shader");
+  let scale = 2;
+
+  element.addEventListener("click", (event) => {
+    const child = element.querySelector("m-shader");
+    child.setAttribute(
+      "frag",
+      `
+      void main() {
+        vec2 uv = ${(++scale).toFixed(1)} * vUv;
+        vec3 color = vec3(fract(uv), 0.0);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    );
+    child.setAttribute("data-scale", scale);
+  });
+</script>

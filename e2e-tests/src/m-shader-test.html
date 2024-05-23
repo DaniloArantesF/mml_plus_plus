@@ -1,0 +1,94 @@
+<m-light type="point" intensity="900" x="0" y="15" z="15"></m-light>
+
+<m-shader id="simple-shader" width="10" height="10" y="5"> </m-shader>
+
+<m-label id="addChild" content="Add child" x="-5" y="10.5" z="1" color="gray"> </m-label>
+<m-label id="removeChild" content="Remove child" x="-3.5" y="10.5" z="1" color="gray"> </m-label>
+
+<m-label id="count" width="2.5" content="Children count: 0" x="-1" y="10.5" z="1"> </m-label>
+
+<script>
+  const rootShader = document.getElementById("simple-shader");
+  const addChildButton = document.getElementById("addChild");
+  const removeChildButton = document.getElementById("removeChild");
+  const countLabel = document.getElementById("count");
+
+  const getOutputShader = () => `
+      void main() {
+        vec2 uv = ${rootShader.childElementCount.toFixed(1)} * vUv;
+        vec3 color = vec3(fract(uv), 0.0);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+  const getNthShader = (n) => `
+        uniform sampler2D prgm${n + 1}Texture;
+      void main() {
+        gl_FragColor = vec4(texture(prgm${n + 1}Texture, vUv).xyz, 1.0);
+      }
+      `;
+
+  rootShader.setAttribute("frag", getOutputShader());
+  rootShader.addEventListener("click", (event) => {
+    rootShader.setAttribute(
+      "frag",
+      getOutputShader().replace(
+        "gl_FragColor = vec4(color, 1.0);",
+        "gl_FragColor = vec4(vUv, 0.0, 1.0);",
+      ),
+    );
+  });
+
+  addChildButton.addEventListener("click", addChild.bind(this));
+  removeChildButton.addEventListener("click", removeChild.bind(this));
+
+  function addChild() {
+    const childrenCount = rootShader.children.length;
+    // First child, change the output of root shader to display texture 1
+    if (childrenCount === 0) {
+      rootShader.setAttribute(
+        "frag",
+        `
+        uniform sampler2D prgm1Texture;
+        void main() {
+          gl_FragColor = vec4(texture(prgm1Texture, vUv).xyz, 1.0);
+        }
+      `,
+      );
+    }
+
+    // Update current last child to output the new texture
+    const lastChild = rootShader.children[childrenCount - 1];
+    if (lastChild) {
+      lastChild.setAttribute("frag", getNthShader(childrenCount));
+    }
+
+    const mChild = document.createElement("m-shader");
+    rootShader.appendChild(mChild);
+    mChild.setAttribute("frag", getOutputShader());
+    updateLabel();
+  }
+
+  function removeChild() {
+    const childrenCount = rootShader.children.length;
+    if (childrenCount === 0) return;
+    rootShader.removeChild(rootShader.children[childrenCount - 1]);
+
+    if (childrenCount - 1 > 0) {
+      // Update current last child to output the new texture
+      const lastChild = rootShader.children[childrenCount - 2];
+      if (lastChild) {
+        lastChild.setAttribute("frag", getOutputShader());
+      }
+    } else {
+      rootShader.setAttribute("frag", getOutputShader());
+    }
+
+    updateLabel();
+  }
+
+  function updateLabel() {
+    countLabel.setAttribute("content", `Children count: ${rootShader.children.length}`);
+    rootShader.setAttribute("data-children", rootShader.children.length);
+  }
+</script>
