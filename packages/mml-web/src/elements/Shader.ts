@@ -288,6 +288,12 @@ export class Shader extends TransformableElement {
     this.loadedShaderState.hasBuffers = shaders.length > 0;
 
     const textureMaterials: ShaderBufferItem[] = shaders.map((shader, i) => {
+      // Expand texture uniforms if necessary, before creating the material
+      const bufferKey = ShaderBufferManager.getBufferKey(i + 1);
+      if (!this.textureUniforms[bufferKey]) {
+        this.expandTextureUniforms();
+      }
+
       const material = new THREE.ShaderMaterial({
         vertexShader: shader.props.vert,
         fragmentShader: shader.props.frag,
@@ -306,13 +312,23 @@ export class Shader extends TransformableElement {
       const readTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
       const writeTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
-      this.textureUniforms[ShaderBufferManager.getBufferKey(i + 1)].value = readTarget.texture;
-
+      this.textureUniforms[bufferKey].value = readTarget.texture;
       return { material, readTarget, writeTarget };
     });
 
     this.loadedShaderState.bufferManager.dispose();
     this.loadedShaderState.bufferManager.setBuffers(textureMaterials);
+  }
+
+  private expandTextureUniforms() {
+    const textureCount = this.children.length;
+    const curSize = MAX_SHADER_TEXTURES * Math.floor(textureCount / MAX_SHADER_TEXTURES);
+    const nextSize = MAX_SHADER_TEXTURES * Math.ceil(textureCount / MAX_SHADER_TEXTURES); // Round up to the nearest multiple of MAX_SHADER_TEXTURES
+    for (let i = curSize; i < nextSize; i++) {
+      const bufferKey = ShaderBufferManager.getBufferKey(i + 1);
+      this.textureUniforms[bufferKey] = new THREE.Uniform(null);
+      this.uniforms[bufferKey] = this.textureUniforms[bufferKey];
+    }
   }
 
   private parseCustomUniforms() {
@@ -595,6 +611,7 @@ export class Shader extends TransformableElement {
       return;
     }
 
+    this.expandTextureUniforms();
     this.createShaderMaterial();
     this.createShaderMesh();
 
