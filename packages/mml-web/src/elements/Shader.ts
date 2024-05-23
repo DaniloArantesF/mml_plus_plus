@@ -196,7 +196,6 @@ export class Shader extends TransformableElement {
     height: defaultShaderHeight as number | null,
     audio: defaultAudioNode as string | null,
     video: defaultVideoNode as string | null,
-    probe: null as string | null,
     type: defaultShaderType as "mesh" | "points",
     collisionInterval: defaultCollisionInterval as string | null,
     fog: defaultFog as boolean,
@@ -561,15 +560,11 @@ export class Shader extends TransformableElement {
   }
 
   private updateCollisionPosition(elementRelative: Pick<PositionAndRotation, "position">) {
-    const shaderDimentions = {
-      width: parseInt(this.getAttribute("width") || "1"),
-      height: parseInt(this.getAttribute("height") || "1"),
-    };
-    const offsetX = shaderDimentions.width / 2;
-    const offsetZ = shaderDimentions.height / 2;
+    const offsetX = 1 / 2;
+    const offsetZ = 1 / 2;
     this.uniforms.mouse.value = {
-      x: (elementRelative.position.x + offsetX) / shaderDimentions.width,
-      y: (elementRelative.position.y + offsetZ) / shaderDimentions.height,
+      x: elementRelative.position.x + offsetX,
+      y: elementRelative.position.y + offsetZ,
     };
   }
 
