@@ -1,0 +1,164 @@
+<m-light
+  type="spotlight"
+  intensity="900"
+  intensity="900"
+  ry="45"
+  rx="65"
+  rz="-45"
+  x="10"
+  y="20"
+  z="20"
+></m-light>
+<m-group id="cubes" y="0"></m-group>
+
+<m-group x="-5.25">
+  <m-label
+    y="11"
+    x="0"
+    width="2"
+    alignment="center"
+    id="addCubes"
+    content="Add cubes"
+    color="limegreen"
+  ></m-label>
+  <m-label
+    y="11"
+    x="2.5"
+    width="2"
+    alignment="center"
+    id="removeCubes"
+    content="Remove cubes"
+    color="firebrick"
+    font-color="white"
+  ></m-label>
+</m-group>
+
+<m-group x="-4" y="9.5" id="valueSelector">
+  <m-label x="-1.75" width="1" alignment="center" id="decreaseValue" content="-"></m-label>
+  <m-label x="0" width="2" alignment="center" id="currentValue" content="Value: 10"></m-label>
+  <m-label x="1.75" width="1" alignment="center" id="increaseValue" content="+"></m-label>
+</m-group>
+
+<m-group y="9.5" x="2.5">
+  <m-label
+    y="1.5"
+    x="0"
+    width="2"
+    alignment="center"
+    id="instanced"
+    content="Instanced: 0"
+  ></m-label>
+  <m-label
+    y="1.5"
+    x="3.5"
+    width="2"
+    alignment="center"
+    id="nonInstanced"
+    content="Default mesh: 0"
+  ></m-label>
+  <m-label x="0" width="2" alignment="center" id="cubeCount" content="Cube Count: 0"></m-label>
+  <!-- <m-label x="3.5" width="2" alignment="center" id="drawDisplay" content="Draw calls: 0"></m-label> -->
+</m-group>
+
+<script>
+  let operationValue = 10;
+  let instanced = false;
+  const container = document.getElementById("cubes");
+  const cubes = [];
+
+  // Operations
+  const addCubesButton = document.getElementById("addCubes");
+  const removeCubesButton = document.getElementById("removeCubes");
+  const switchTypeButton = document.getElementById("switchType");
+
+  const columns = 10;
+  const rows = 5;
+
+  function addCubes() {
+    let curCount = cubes.length;
+    for (let i = curCount; i < curCount + operationValue; i++) {
+      const cube = document.createElement("m-cube");
+      cube.setAttribute("x", (i % columns) - Math.floor(columns / 2));
+      cube.setAttribute("y", Math.floor(i / columns));
+      cube.setAttribute("z", 1);
+      cube.setAttribute("width", 0.5);
+      cube.setAttribute("height", 0.5);
+      cube.setAttribute("depth", 0.5);
+      cube.setAttribute("color", instanced ? "red" : "blue");
+      cube.setAttribute("instanced", instanced.toString());
+      cube.addEventListener("click", changeMeshType.bind(this));
+      cubes.push(cube);
+      container.append(cube);
+    }
+    updateDisplays();
+  }
+
+  function removeCubes() {
+    let i = 0;
+    while (i < operationValue && cubes.length > 0) {
+      container.removeChild(cubes.pop());
+      i++;
+    }
+    updateDisplays();
+  }
+
+  function changeMeshType(event) {
+    const isInstanced = event.target.getAttribute("instanced") === "true";
+    event.target.setAttribute("instanced", (!isInstanced).toString());
+    if (!isInstanced) {
+      event.target.setAttribute("color", "red");
+    } else {
+      event.target.setAttribute("color", "blue");
+    }
+    updateDisplays();
+  }
+
+  addCubesButton.addEventListener("click", addCubes);
+  removeCubesButton.addEventListener("click", removeCubes);
+
+  // Value selector
+  const decreaseButton = document.getElementById("decreaseValue");
+  const increaseButton = document.getElementById("increaseValue");
+  const valueLabel = document.getElementById("currentValue");
+
+  decreaseButton.addEventListener("click", () => {
+    operationValue = Math.max(0, operationValue - 1);
+    valueLabel.setAttribute("content", "Value: " + operationValue);
+    valueLabel.setAttribute("data-value", operationValue);
+  });
+
+  increaseButton.addEventListener("click", () => {
+    operationValue = Math.min(10, operationValue + 1);
+    valueLabel.setAttribute("content", "Value: " + operationValue);
+    valueLabel.setAttribute("data-value", operationValue);
+  });
+
+  // Cube count
+  function updateCubeCount() {
+    const cubeCountLabel = document.getElementById("cubeCount");
+    cubeCountLabel.setAttribute("content", "Cube Count: " + cubes.length);
+    cubeCountLabel.setAttribute("data-cube-count", cubes.length);
+  }
+
+  function updateDisplays() {
+    const instancedLabel = document.getElementById("instanced");
+    const nonInstancedLabel = document.getElementById("nonInstanced");
+
+    let instancedCount = 0;
+    let nonInstancedCount = 0;
+
+    cubes.forEach((cube) => {
+      if (cube.getAttribute("instanced") === "true") {
+        instancedCount++;
+      } else {
+        nonInstancedCount++;
+      }
+    });
+
+    updateCubeCount();
+    instancedLabel.setAttribute("content", "Instanced: " + instancedCount);
+    instancedLabel.setAttribute("data-instanced", instancedCount);
+    nonInstancedLabel.setAttribute("content", "Default mesh: " + nonInstancedCount);
+    nonInstancedLabel.setAttribute("data-default-mesh", nonInstancedCount);
+  }
+</script>
