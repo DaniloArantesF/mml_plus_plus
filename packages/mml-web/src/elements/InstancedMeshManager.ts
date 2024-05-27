@@ -177,10 +177,21 @@ class InstancedMeshManager {
   }
 
   public unregister(index: number): void {
-    this.cubeMesh.setMatrixAt(index, new THREE.Matrix4());
+    // Shift instances after the removed index
+    const curMatrix = new THREE.Matrix4();
+    for (let i = index + 1; i <= this.cubeCount; i++) {
+      this.cubeMesh.getMatrixAt(i, curMatrix);
+      this.cubeMesh.setMatrixAt(i - 1, curMatrix);
+      const parent = this.parentMap.get(i);
+      if (parent) {
+        parent.setInstanceIndex(i - 1);
+        this.parentMap.set(i - 1, parent);
+        this.parentMap.delete(i);
+      }
+    }
+
     this.cubeMesh.count = --this.cubeCount;
     this.cubeMesh.instanceMatrix.needsUpdate = true;
-    this.parentMap.delete(index);
     if (this.cubeCount === 0) {
       this.material.needsUpdate = true;
     }
