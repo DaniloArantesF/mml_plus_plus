@@ -25,10 +25,11 @@ class InstancedMeshManager {
   private static instance?: InstancedMeshManager;
   public cubeMesh: THREE.InstancedMesh;
   private scene?: THREE.Scene;
+  private rootContainer?: THREE.Object3D;
 
   private constructor(scene: THREE.Scene) {
-    this.cubeMesh = this.createCubeMesh(scene);
     this.scene = scene;
+    this.rootContainer = scene.children[0];
   }
 
   public static getInstance(scene: THREE.Scene) {
@@ -42,7 +43,7 @@ class InstancedMeshManager {
     return this.parentMap.get(instanceId) || null;
   }
 
-  private createCubeMesh(scene: THREE.Scene): THREE.InstancedMesh {
+  private createCubeMesh(): THREE.InstancedMesh {
     const cubeMesh = new THREE.InstancedMesh(this.boxGeometry, this.material, 1024);
     cubeMesh.count = this.cubeCount;
     cubeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -52,7 +53,7 @@ class InstancedMeshManager {
       cubeMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     }
 
-    scene.add(cubeMesh);
+    this.rootContainer?.add(cubeMesh);
     return cubeMesh;
   }
 
@@ -91,7 +92,7 @@ class InstancedMeshManager {
         modelData?.group.add(mesh);
       });
 
-      this.scene?.add(modelData.group);
+      this.rootContainer?.add(modelData.group);
     }
 
     modelData.parentMap.set(newIndex, parent);
@@ -165,6 +166,7 @@ class InstancedMeshManager {
 
   public register(matrix: THREE.Matrix4, color: THREE.Color, parent: MElement): number {
     if (this.cubeCount === 0) {
+      this.cubeMesh = this.createCubeMesh();
       this.material.needsUpdate = true;
     }
 

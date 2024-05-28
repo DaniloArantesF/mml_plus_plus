@@ -438,6 +438,13 @@
               </xs:documentation>
             </xs:annotation>
           </xs:attribute>
+          <xs:attribute name="instanced" type="xs:boolean">
+            <xs:annotation>
+              <xs:documentation>
+                Whether this cube should be an instanced mesh. Default value is false.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
         </xs:extension>
       </xs:complexContent>
     </xs:complexType>
@@ -678,6 +685,13 @@
             <xs:annotation>
               <xs:documentation>
                 The time in milliseconds since the start of the document lifecycle when the animation should pause. If there is no value the animation will not be paused.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="instanced" type="xs:boolean">
+            <xs:annotation>
+              <xs:documentation>
+                Whether this model should be an instanced mesh. Default value is false.
               </xs:documentation>
             </xs:annotation>
           </xs:attribute>
@@ -1413,4 +1427,3 @@
     </xs:complexType>
   </xs:element>
 </xs:schema>
-

@@ -89,7 +89,7 @@ export class MMLClickTrigger {
 
     // Get instanced meshes and re-order the intersections array
     const intersections = this.raycaster.intersectObjects(
-      [this.scene.getRootContainer(), this.instancedMeshManager.cubeMesh],
+      [this.scene.getRootContainer(), /*this.instancedMeshManager.cubeMesh */],
       true,
     );
 

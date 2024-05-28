@@ -80,5 +80,8 @@ export function createWrappedScene(
     getLoadingProgressManager: () => {
       return loadingProgressManager;
     },
+    getInstancedMeshManager: () => {
+      return scene.getInstancedMeshManager();
+    },
   };
 }

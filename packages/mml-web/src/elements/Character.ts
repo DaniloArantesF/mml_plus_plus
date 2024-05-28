@@ -6,7 +6,7 @@ export class Character extends Model {
   static tagName = "m-character";
 
   static get observedAttributes(): Array<string> {
-    return [...Model.observedAttributes];
+    return [...Model.observedAttributes.filter((attr) => attr !== "instanced")];
   }
 
   constructor() {
