@@ -44,17 +44,94 @@ class InstancedMeshManager {
   }
 
   private createCubeMesh(): THREE.InstancedMesh {
-    const cubeMesh = new THREE.InstancedMesh(this.boxGeometry, this.material, 1024);
+    const instancedGeometry = new THREE.InstancedBufferGeometry();
+
+    // Copy attributes from box geometry
+    instancedGeometry.index = this.boxGeometry.index;
+    instancedGeometry.attributes = this.boxGeometry.attributes;
+
+    // Add instance attributes
+    const instancePositions = new Float32Array(1024 * 3);
+    instancedGeometry.setAttribute(
+      "instancePosition",
+      new THREE.InstancedBufferAttribute(instancePositions, 3),
+    );
+
+    const instanceQuaternions = new Float32Array(1024 * 4);
+    instancedGeometry.setAttribute(
+      "instanceQuaternion",
+      new THREE.InstancedBufferAttribute(instanceQuaternions, 4),
+    );
+
+    const instanceScales = new Float32Array(1024 * 3);
+    instancedGeometry.setAttribute(
+      "instanceScale",
+      new THREE.InstancedBufferAttribute(instanceScales, 3),
+    );
+
+    const cubeMesh = new THREE.InstancedMesh(instancedGeometry, this.material, 1024);
     cubeMesh.count = this.cubeCount;
     cubeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     cubeMesh.instanceMatrix.needsUpdate = true;
 
-    if (cubeMesh.instanceColor) {
-      cubeMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-    }
+    // Enable shadows
+    cubeMesh.castShadow = true;
+    cubeMesh.receiveShadow = true;
 
     this.rootContainer?.add(cubeMesh);
     return cubeMesh;
+  }
+
+  private createModelMesh(model: THREE.Group, parent: Model) {
+    const modelData = {
+      original: model,
+      count: 1,
+      group: new THREE.Group(),
+      parentMap: new Map(),
+    };
+
+    // Create an instanced mesh per mesh in the model
+    traverseImmediateMeshChildren(model, (child) => {
+      const instancedGeometry = new THREE.InstancedBufferGeometry();
+      instancedGeometry.index = child.geometry.index;
+      instancedGeometry.attributes = child.geometry.attributes;
+
+      const mesh = new THREE.InstancedMesh(instancedGeometry, child.material, 1024);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.name = child.name;
+      mesh.count = 1;
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      const clone = child.clone();
+      clone.applyMatrix4(parent.getInstanceMatrix());
+      mesh.setMatrixAt(0, clone.matrix);
+      mesh.instanceMatrix.needsUpdate = true;
+
+      // Initialize the new attributes for the mesh
+      const instancePositions = new Float32Array(1024 * 3);
+      instancedGeometry.setAttribute(
+        "instancePosition",
+        new THREE.InstancedBufferAttribute(instancePositions, 3),
+      );
+
+      const instanceQuaternions = new Float32Array(1024 * 4);
+      instancedGeometry.setAttribute(
+        "instanceQuaternion",
+        new THREE.InstancedBufferAttribute(instanceQuaternions, 4),
+      );
+
+      const instanceScales = new Float32Array(1024 * 3);
+      instancedGeometry.setAttribute(
+        "instanceScale",
+        new THREE.InstancedBufferAttribute(instanceScales, 3),
+      );
+
+      modelData?.group.add(mesh);
+    });
+
+    return modelData;
   }
 
   public registerModel(key: string, model: THREE.Group, parent: Model): number {
@@ -70,28 +147,8 @@ class InstancedMeshManager {
 
       this.updateModel(key, newIndex);
     } else {
-      modelData = {
-        original: model,
-        count: 1,
-        group: new THREE.Group(),
-        parentMap: new Map(),
-      };
       newIndex = 0;
-
-      // Create an instanced mesh per mesh in the model
-      traverseImmediateMeshChildren(model, (child) => {
-        const mesh = new THREE.InstancedMesh(child.geometry, child.material, 1024);
-        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        mesh.name = child.name;
-        mesh.count = 1;
-
-        const clone = child.clone();
-        clone.applyMatrix4(parent.getInstanceMatrix());
-        mesh.setMatrixAt(0, clone.matrix);
-        mesh.instanceMatrix.needsUpdate = true;
-        modelData?.group.add(mesh);
-      });
-
+      modelData = this.createModelMesh(model, parent);
       this.rootContainer?.add(modelData.group);
     }
 
@@ -109,7 +166,7 @@ class InstancedMeshManager {
 
     modelData.count--;
     if (modelData.count === 0) {
-      this.scene?.remove(modelData.group);
+      this.rootContainer?.remove(modelData.group);
       this.modelMap.delete(key);
     } else {
       // Update each instanced mesh to remove the instance at the given index
@@ -135,12 +192,9 @@ class InstancedMeshManager {
         mesh.count = modelData.count;
         mesh.instanceMatrix.needsUpdate = true;
       });
-      // this.parentMap.delete(index);
     }
   }
 
-  // The idea here is to iterate over Objects recursively to set the offset matrix per mesh
-  // Assumes the approach being taken is for creating one instanced mesh per mesh in the model
   private setInstancedModelMatrix(
     modelData: ModelInstanceData,
     index: number,
@@ -202,6 +256,34 @@ class InstancedMeshManager {
   public update(index: number, matrix?: THREE.Matrix4, color?: THREE.Color): void {
     if (matrix) {
       this.cubeMesh.setMatrixAt(index, matrix);
+
+      const position = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+
+      matrix.decompose(position, quaternion, scale);
+
+      const positionArray = this.cubeMesh.geometry.attributes.instancePosition
+        .array as Float32Array;
+      positionArray[index * 3] = position.x;
+      positionArray[index * 3 + 1] = position.y;
+      positionArray[index * 3 + 2] = position.z;
+      this.cubeMesh.geometry.attributes.instancePosition.needsUpdate = true;
+
+      const quaternionArray = this.cubeMesh.geometry.attributes.instanceQuaternion
+        .array as Float32Array;
+      quaternionArray[index * 4] = quaternion.x;
+      quaternionArray[index * 4 + 1] = quaternion.y;
+      quaternionArray[index * 4 + 2] = quaternion.z;
+      quaternionArray[index * 4 + 3] = quaternion.w;
+      this.cubeMesh.geometry.attributes.instanceQuaternion.needsUpdate = true;
+
+      const scaleArray = this.cubeMesh.geometry.attributes.instanceScale.array as Float32Array;
+      scaleArray[index * 3] = scale.x;
+      scaleArray[index * 3 + 1] = scale.y;
+      scaleArray[index * 3 + 2] = scale.z;
+      this.cubeMesh.geometry.attributes.instanceScale.needsUpdate = true;
+
       this.cubeMesh.instanceMatrix.needsUpdate = true;
       this.cubeMesh.computeBoundingSphere();
     }

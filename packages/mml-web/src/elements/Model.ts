@@ -316,17 +316,39 @@ export class Model extends TransformableElement {
           Model.disposeOfGroup(result.group);
           return;
         }
-        // Check for skinned meshes
+
+        const group = result.group;
+        const bones = new Map<string, THREE.Bone>();
         let hasSkinnedMesh = false;
-        result.group.traverse((child) => {
+        group.traverse((child) => {
+          // Check for skinned meshes.
           if (child instanceof THREE.SkinnedMesh) {
             hasSkinnedMesh = true;
           }
+
+          // Set shadows
+          if ((child as THREE.Mesh).isMesh) {
+            child.castShadow = this.props.castShadows;
+            child.receiveShadow = true;
+          }
+
+          // Save bones
+          if (child instanceof THREE.Bone) {
+            bones.set(child.name, child);
+          }
         });
 
+        // const boundingBox = new THREE.Box3();
+        // group.updateWorldMatrix(true, true);
+        // boundingBox.expandByObject(group);
+        // const orientedBoundingBox = OrientedBoundingBox.fromSizeMatrixWorldProviderAndCenter(
+        //   boundingBox.getSize(new THREE.Vector3(0, 0, 0)),
+        //   this.container,
+        //   boundingBox.getCenter(new THREE.Vector3(0, 0, 0)),
+        // );
         this.loadedState = {
-          group: result.group,
-          bones: new Map(), // Assuming bones map setup is elsewhere if needed
+          group,
+          bones,
           boundingBox: this.calculateBoundingBox(result.group), // You'll need to implement this method
         };
 
