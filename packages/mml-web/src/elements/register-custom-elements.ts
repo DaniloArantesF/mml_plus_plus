@@ -1,4 +1,5 @@
 import { AttributeAnimation } from "./AttributeAnimation";
+import { AttributeLerp } from "./AttributeLerp";
 import { Audio } from "./Audio";
 import { Character } from "./Character";
 import { ChatProbe } from "./ChatProbe";
@@ -44,4 +45,5 @@ export function registerCustomElementsToWindow(targetWindow: Window) {
   targetWindow.customElements.define(Interaction.tagName, Interaction);
   targetWindow.customElements.define(AttributeAnimation.tagName, AttributeAnimation);
   targetWindow.customElements.define(Shader.tagName, Shader);
+  targetWindow.customElements.define(AttributeLerp.tagName, AttributeLerp);
 }
