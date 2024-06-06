@@ -377,7 +377,7 @@ export abstract class TransformableElement extends MElement {
       case "M-CUBE":
         return instanceManager.updateTransform(
           instanceIndex,
-          this.container.position.clone(),
+          this.container.getWorldPosition(new THREE.Vector3()),
           new THREE.Quaternion().setFromEuler(this.container.rotation, true),
           undefined,
         );

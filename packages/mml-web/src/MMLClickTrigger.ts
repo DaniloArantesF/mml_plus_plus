@@ -88,10 +88,7 @@ export class MMLClickTrigger {
     this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.scene.getCamera());
 
     // Get instanced meshes and re-order the intersections array
-    const intersections = this.raycaster.intersectObjects(
-      [this.scene.getRootContainer(), /*this.instancedMeshManager.cubeMesh */],
-      true,
-    );
+    const intersections = this.raycaster.intersectObjects([this.scene.getRootContainer()], true);
 
     if (intersections.length > 0) {
       for (const intersection of intersections) {
