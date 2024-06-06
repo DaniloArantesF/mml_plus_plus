@@ -17,3 +17,4 @@ export * from "./register-custom-elements";
 export * from "./RemoteDocument";
 export * from "./TransformableElement";
 export * from "./Video";
+export * from "./InstancedMeshManager";

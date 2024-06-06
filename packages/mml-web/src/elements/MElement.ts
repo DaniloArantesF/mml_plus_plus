@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import InstancedMeshManager from "./InstancedMeshManager";
+import { InstancedMeshManager } from "./InstancedMeshManager";
 import { RemoteDocument } from "./RemoteDocument";
 import { consumeEventEventName } from "../common";
 import { getGlobalDocumentTimeManager, getGlobalMMLScene } from "../global";

@@ -4,7 +4,7 @@ import { Controls } from "./camera/Controls";
 import { DragFlyCameraControls } from "./camera/DragFlyCameraControls";
 import { PointerLockFlyCameraControls } from "./camera/PointerLockFlyCameraControls";
 import { ChatProbe } from "./elements/ChatProbe";
-import InstancedMeshManager from "./elements/InstancedMeshManager";
+import { InstancedMeshManager } from "./elements/InstancedMeshManager";
 import { Interaction } from "./elements/Interaction";
 import { MElement } from "./elements/MElement";
 import { InteractionManager } from "./interaction-ui";
@@ -64,7 +64,7 @@ export type IMMLScene = {
   prompt: (promptProps: PromptProps, callback: (message: string | null) => void) => void;
 
   getLoadingProgressManager?: () => LoadingProgressManager | null;
-  getInstancedMeshManager: () => InstancedMeshManager;
+  getInstancedMeshManager: () => InstancedMeshManager | null;
 };
 
 export enum ControlsType {

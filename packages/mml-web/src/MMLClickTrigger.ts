@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import InstancedMeshManager from "./elements/InstancedMeshManager";
+import { InstancedMeshManager } from "./elements/InstancedMeshManager";
 import { MElement } from "./elements/MElement";
 import { IMMLScene } from "./MMLScene";
 import { EventHandlerCollection } from "./utils/events/EventHandlerCollection";

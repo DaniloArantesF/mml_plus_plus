@@ -10,7 +10,7 @@ type ModelInstanceData = {
   parentMap: Map<number, Model>;
 };
 
-class InstancedMeshManager {
+export class InstancedMeshManager {
   private modelMap: Map<string, ModelInstanceData> = new Map();
   private parentMap: Map<number, MElement> = new Map(); // Maps instanceId to parent MElement
 
@@ -345,8 +345,6 @@ class InstancedMeshManager {
     this.cubeMesh.dispose();
   }
 }
-
-export default InstancedMeshManager;
 
 function traverseImmediateMeshChildren(
   object: THREE.Object3D,

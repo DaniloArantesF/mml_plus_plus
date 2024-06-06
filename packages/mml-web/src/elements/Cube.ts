@@ -339,7 +339,6 @@ export class Cube extends TransformableElement {
 
   public connectedCallback(): void {
     super.connectedCallback();
-
     if (this.props.instanced) {
       this.container.updateMatrix();
 
@@ -402,6 +401,9 @@ export class Cube extends TransformableElement {
       }
       this.initMesh();
     }
+
+    this.applyBounds();
+    this.collideableHelper.updateCollider(this.mesh);
   }
 
   private updateInstancedMesh(): void {
