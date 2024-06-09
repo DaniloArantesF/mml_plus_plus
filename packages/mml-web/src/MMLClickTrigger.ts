@@ -89,6 +89,7 @@ export class MMLClickTrigger {
 
     // Get instanced meshes and re-order the intersections array
     const intersections = this.raycaster.intersectObjects([this.scene.getRootContainer()], true);
+
     if (intersections.length > 0) {
       for (const intersection of intersections) {
         let obj: THREE.Object3D | null = intersection.object;
