@@ -34,6 +34,7 @@ export class Cube extends TransformableElement {
       (newValue: number) => {
         if (this.props.instanced) {
           this.container.scale.x = minimumNonZero(newValue);
+          this.mesh.scale.x = this.props.width;
           this.updateInstancedMesh();
         }
       },
@@ -44,6 +45,7 @@ export class Cube extends TransformableElement {
       (newValue: number) => {
         if (this.props.instanced) {
           this.container.scale.y = minimumNonZero(newValue);
+          this.mesh.scale.y = this.props.height;
           this.updateInstancedMesh();
         }
       },
@@ -54,6 +56,8 @@ export class Cube extends TransformableElement {
       (newValue: number) => {
         if (this.props.instanced) {
           this.container.scale.z = minimumNonZero(newValue);
+          this.mesh.scale.z = this.props.depth;
+          this.mesh.matrixWorld = this.container.matrixWorld;
           this.updateInstancedMesh();
         }
       },
@@ -80,13 +84,11 @@ export class Cube extends TransformableElement {
       defaultCubeWidth,
       (newValue: number) => {
         this.props.width = newValue;
+        this.mesh.scale.x = this.props.width;
 
         if (this.props.instanced) {
           this.updateInstancedMesh();
-        } else {
-          this.mesh.scale.x = this.props.width;
         }
-
         this.applyBounds();
         this.collideableHelper.updateCollider(this.mesh);
       },
@@ -96,11 +98,9 @@ export class Cube extends TransformableElement {
       defaultCubeHeight,
       (newValue: number) => {
         this.props.height = newValue;
-
+        this.mesh.scale.y = this.props.height;
         if (this.props.instanced) {
           this.updateInstancedMesh();
-        } else {
-          this.mesh.scale.y = this.props.height;
         }
 
         this.applyBounds();
@@ -112,11 +112,9 @@ export class Cube extends TransformableElement {
       defaultCubeDepth,
       (newValue: number) => {
         this.props.depth = newValue;
-
+        this.mesh.scale.z = this.props.depth;
         if (this.props.instanced) {
           this.updateInstancedMesh();
-        } else {
-          this.mesh.scale.z = this.props.depth;
         }
 
         this.applyBounds();
@@ -246,57 +244,21 @@ export class Cube extends TransformableElement {
   }
 
   private initMesh() {
-    if (this.props.instanced) {
-      // Initialize instanced mesh attributes
-      this.material = new THREE.MeshStandardMaterial({
-        color: this.props.color,
-        transparent: this.props.opacity !== 1,
-        opacity: this.props.opacity,
-      });
-      const shaderChunks = {
-        instance_pars_vertex: /* glsl */ `
-          attribute vec3 instancePosition;
-          attribute vec4 instanceQuaternion;
-          attribute vec3 instanceScale;
-          vec3 applyTRS (vec3 position, vec3 translation, vec4 quaternion, vec3 scale) {
-            position *= scale;
-            position += 2.0 * cross(quaternion.xyz, cross(quaternion.xyz, position) + quaternion.w * position);
-            return position + translation;
-          }`,
-        instance_vertex: `
-          transformed = applyTRS(transformed.xyz, instancePosition, instanceQuaternion, instanceScale);
-          `,
-      };
-      this.material.onBeforeCompile = (shader) => {
-        shader.vertexShader = shaderChunks.instance_pars_vertex + "\n" + shader.vertexShader;
-        shader.vertexShader = shader.vertexShader.replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>
-          ${shaderChunks.instance_vertex}
-          `,
-        );
-      };
-      this.mesh = new THREE.InstancedMesh(
-        Cube.boxGeometry,
-        this.material,
-        1024,
-      ) as unknown as THREE.Mesh<THREE.BoxGeometry, THREE.Material | Array<THREE.Material>>;
-    } else {
-      // Initialize regular mesh
-      this.material = new THREE.MeshStandardMaterial({
-        color: this.props.color,
-        transparent: this.props.opacity !== 1,
-        opacity: this.props.opacity,
-      });
-      this.mesh = new THREE.Mesh(Cube.boxGeometry, this.material);
-      this.mesh.scale.x = this.props.width;
-      this.mesh.scale.y = this.props.height;
-      this.mesh.scale.z = this.props.depth;
-    }
+    this.material = new THREE.MeshStandardMaterial({
+      color: this.props.color,
+      transparent: this.props.opacity !== 1,
+      opacity: this.props.opacity,
+    });
+    this.mesh = new THREE.Mesh(Cube.boxGeometry, this.material);
+    this.mesh.scale.x = this.props.width;
+    this.mesh.scale.y = this.props.height;
+    this.mesh.scale.z = this.props.depth;
 
     this.mesh.castShadow = this.props.castShadows;
     this.mesh.receiveShadow = true;
     this.container.add(this.mesh);
+
+    this.mesh.matrixWorld = this.container.matrixWorld;
   }
 
   public addSideEffectChild(child: MElement): void {
@@ -371,7 +333,7 @@ export class Cube extends TransformableElement {
     super.disconnectedCallback();
   }
 
-  private getInstanceMatrix() {
+  public getInstanceMatrix() {
     const position = this.container.getWorldPosition(new THREE.Vector3());
     const quaternion = this.container.getWorldQuaternion(new THREE.Quaternion());
     const scale = new THREE.Vector3().multiplyVectors(

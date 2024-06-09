@@ -251,8 +251,7 @@ export abstract class TransformableElement extends MElement {
 
   private didUpdateTransformation() {
     const instancedIndex = this.getInstanceIndex();
-
-    // Update position and rotation of transformable instance
+    // Update transformable instance
     if (instancedIndex !== undefined) {
       this.updateInstanceTransform();
     }

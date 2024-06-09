@@ -295,4 +295,9 @@ export abstract class MElement extends HTMLElement {
     bufferAttribute.gpuType = THREE.IntType;
     geometry.setAttribute("id", bufferAttribute);
   }
+
+  public getInstanceMatrix(): THREE.Matrix4 | null {
+    // no-op
+    return null;
+  }
 }

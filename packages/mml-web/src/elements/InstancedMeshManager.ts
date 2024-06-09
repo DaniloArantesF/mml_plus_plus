@@ -43,6 +43,20 @@ export class InstancedMeshManager {
     return this.parentMap.get(instanceId) || null;
   }
 
+  public getInstanceMatrix(instanceId: number) {
+    const matrix = new THREE.Matrix4();
+    this.cubeMesh?.getMatrixAt(instanceId, matrix);
+    return matrix;
+  }
+
+  public getModelInstanceMatrix(src: string, instanceId: number) {
+    const modelData = this.modelMap.get(src);
+    if (!modelData) {
+      return null;
+    }
+    return modelData.parentMap.get(instanceId)?.getInstanceMatrix();
+  }
+
   private createCubeMesh(): THREE.InstancedMesh {
     const instancedGeometry = new THREE.InstancedBufferGeometry();
 

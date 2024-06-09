@@ -338,14 +338,6 @@ export class Model extends TransformableElement {
           }
         });
 
-        // const boundingBox = new THREE.Box3();
-        // group.updateWorldMatrix(true, true);
-        // boundingBox.expandByObject(group);
-        // const orientedBoundingBox = OrientedBoundingBox.fromSizeMatrixWorldProviderAndCenter(
-        //   boundingBox.getSize(new THREE.Vector3(0, 0, 0)),
-        //   this.container,
-        //   boundingBox.getCenter(new THREE.Vector3(0, 0, 0)),
-        // );
         this.loadedState = {
           group,
           bones,
