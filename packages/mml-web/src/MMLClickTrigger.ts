@@ -36,7 +36,7 @@ export class MMLClickTrigger {
     this.eventHandlerCollection.add(clickTarget, "mouseup", this.handleMouseUp.bind(this));
     this.eventHandlerCollection.add(clickTarget, "mousemove", this.handleMouseMove.bind(this));
 
-    this.instancedMeshManager = InstancedMeshManager.getInstance(scene.getThreeScene());
+    this.instancedMeshManager = InstancedMeshManager.getInstance(scene);
   }
 
   public setInstancedMeshManager(instancedMeshManager: InstancedMeshManager) {
@@ -87,9 +87,7 @@ export class MMLClickTrigger {
     }
     this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.scene.getCamera());
 
-    // Get instanced meshes and re-order the intersections array
     const intersections = this.raycaster.intersectObjects([this.scene.getRootContainer()], true);
-
     if (intersections.length > 0) {
       for (const intersection of intersections) {
         let obj: THREE.Object3D | null = intersection.object;
@@ -102,8 +100,16 @@ export class MMLClickTrigger {
           }
 
           let mElement = MElement.getMElementFromObject(obj);
-          if (!mElement && (obj as any).isInstancedMesh) {
-            mElement = this.instancedMeshManager.getParent(intersection.instanceId ?? -1);
+          if (!mElement && (obj as THREE.InstancedMesh).isInstancedMesh) {
+            const modelSrc = obj.userData.originalSrc;
+            if (modelSrc) {
+              mElement = this.instancedMeshManager.getModelParent(
+                modelSrc,
+                intersection.instanceId ?? -1,
+              );
+            } else {
+              mElement = this.instancedMeshManager.getParent(intersection.instanceId ?? -1);
+            }
           }
 
           if (mElement && mElement.isClickable()) {

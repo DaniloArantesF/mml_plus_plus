@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 import { MElement } from "./MElement";
 import { Model } from "./Model";
+import { IMMLScene } from "../MMLScene";
 
 type ModelInstanceData = {
   count: number;
@@ -24,15 +25,17 @@ export class InstancedMeshManager {
 
   private static instance?: InstancedMeshManager;
   public cubeMesh: THREE.InstancedMesh;
+  private mmlScene?: IMMLScene;
   private scene?: THREE.Scene;
   private rootContainer?: THREE.Object3D;
 
-  private constructor(scene: THREE.Scene) {
-    this.scene = scene;
-    this.rootContainer = scene.children[0];
+  private constructor(scene: IMMLScene) {
+    this.mmlScene = scene;
+    this.scene = scene.getThreeScene();
+    this.rootContainer = scene.getRootContainer();
   }
 
-  public static getInstance(scene: THREE.Scene) {
+  public static getInstance(scene: IMMLScene) {
     if (!InstancedMeshManager.instance) {
       InstancedMeshManager.instance = new InstancedMeshManager(scene);
     }
@@ -41,6 +44,15 @@ export class InstancedMeshManager {
 
   public getParent(instanceId: number) {
     return this.parentMap.get(instanceId) || null;
+  }
+
+  public getModelData(src: string) {
+    return this.modelMap.get(src) || null;
+  }
+
+  public getModelParent(src: string, instanceId: number) {
+    const modelData = this.modelMap.get(src);
+    return modelData?.parentMap.get(instanceId) || null;
   }
 
   public getInstanceMatrix(instanceId: number) {
@@ -96,7 +108,7 @@ export class InstancedMeshManager {
     return cubeMesh;
   }
 
-  private createModelMesh(model: THREE.Group, parent: Model) {
+  private createModelMesh(src: string, model: THREE.Group, parent: Model) {
     const modelData = {
       original: model,
       count: 1,
@@ -114,6 +126,8 @@ export class InstancedMeshManager {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.name = child.name;
       mesh.count = 1;
+      mesh.userData.parentElement = parent;
+      mesh.userData.originalSrc = src; // save src to handle clicks later
 
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -162,7 +176,7 @@ export class InstancedMeshManager {
       this.updateModel(key, newIndex);
     } else {
       newIndex = 0;
-      modelData = this.createModelMesh(model, parent);
+      modelData = this.createModelMesh(key, model, parent);
       this.rootContainer?.add(modelData.group);
     }
 
@@ -355,7 +369,7 @@ export class InstancedMeshManager {
   }
 
   public dispose() {
-    this.scene?.remove(this.cubeMesh);
+    this.rootContainer?.remove(this.cubeMesh);
     this.cubeMesh.dispose();
   }
 }

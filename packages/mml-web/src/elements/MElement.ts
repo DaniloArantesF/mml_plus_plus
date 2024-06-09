@@ -246,7 +246,7 @@ export abstract class MElement extends HTMLElement {
       throw new Error("Already connected to a parent");
     }
 
-    this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene().getThreeScene());
+    this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene());
 
     const mElementParent = this.getMElementParent();
     if (mElementParent) {
@@ -273,7 +273,7 @@ export abstract class MElement extends HTMLElement {
 
   public getInstanceManager() {
     if (!this.instancedMeshManager) {
-      this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene().getThreeScene());
+      this.instancedMeshManager = InstancedMeshManager.getInstance(this.getScene());
     }
     return this.instancedMeshManager;
   }
